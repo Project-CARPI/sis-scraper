@@ -180,4 +180,5 @@ cython_debug/
 logs/
 data/
 scraper_data/
+processed_data/
 .env

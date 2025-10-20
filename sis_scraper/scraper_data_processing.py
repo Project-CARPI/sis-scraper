@@ -44,10 +44,13 @@ def codify_restriction(restriction: str) -> str:
 
 
 def generate_rcsid(
-    instructor_name: str, instructor_rcsid_name_map: dict[str, str]
+    instructor_name: str,
+    instructor_rcsid_name_map: dict[str, str],
+    generated_instructor_rcsid_name_map: dict[str, str],
 ) -> str:
     """
     Accepts an instructor name in the format `Last, First` and generates an RCSID.
+    Assumes the instructor name does not have an associated RCSID in the SIS data.
     """
     instructor_name_pattern = r"(.+), (.+)"
     match = re.match(instructor_name_pattern, instructor_name)
@@ -57,16 +60,16 @@ def generate_rcsid(
     # An RCSID is composed of up to the first 5 letters of the last name, followed by
     # the first name initial, as well as a number if needed to ensure uniqueness.
     # For example, "Doe, John" would become "doej", or "doej2" if "doej" is taken.
-    last_name = match.group(1)
-    first_name = match.group(2)
+    last_name = match.group(1)[:5].lower()
+    first_name = match.group(2)[0].lower()
     rcsid = f"{last_name}{first_name}"
     # Ensure uniqueness
     counter = 1
     while rcsid in instructor_rcsid_name_map:
         rcsid = f"{last_name}{first_name}{counter}"
         counter += 1
-    # TODO: DONT DO THIS
-    instructor_rcsid_name_map[rcsid] = instructor_name
+    # The generated RCSID may already exist in the generated map, this is normal
+    generated_instructor_rcsid_name_map[rcsid] = instructor_name
     return rcsid
 
 
@@ -74,6 +77,7 @@ def post_process(
     term_course_data: dict[str, Any],
     subject_code_name_map: dict[str, str],
     instructor_rcsid_name_map: dict[str, str],
+    generated_instructor_rcsid_name_map: dict[str, str],
 ) -> None:
     for _, subject_data in term_course_data.items():
         subject_courses = subject_data["courses"]
@@ -85,22 +89,35 @@ def post_process(
             course_attributes = course_detail["attributes"]
             course_restriction_types = course_detail["restrictions"]
             course_sections = course_detail["sections"]
+
+            # Corequisites
             for i, corequisite in enumerate(course_corequisites):
                 course_corequisites[i] = codify_course_code(
                     corequisite, subject_code_name_map
                 )
-            for i, prerequisite in enumerate(course_prerequisites):
-                pass
+
+            # Prerequisites
+            # Will implement when prerequisite parsing is done
+            # for i, prerequisite in enumerate(course_prerequisites):
+            #     pass
+
+            # Crosslists
             for i, crosslist in enumerate(course_crosslists):
                 course_crosslists[i] = codify_course_code(
                     crosslist, subject_code_name_map
                 )
+
+            # Attributes
             for i, attribute in enumerate(course_attributes):
                 course_attributes[i] = codify_attribute(attribute)
+
+            # Restrictions
             for restriction_type in course_restriction_types:
                 restriction_type_list = course_restriction_types[restriction_type]
                 for i, restriction in enumerate(restriction_type_list):
                     restriction_type_list[i] = codify_restriction(restriction)
+
+            # Instructors
             for section in course_sections:
                 instructor_list = section["instructor"]
                 instructor_pattern = r"(.+), (.+) \((.+)\)"
@@ -115,7 +132,9 @@ def post_process(
                     instructor_rcsid = match.group(3)
                     if instructor_rcsid == "Unknown RCSID":
                         instructor_rcsid = generate_rcsid(
-                            instructor_name, instructor_rcsid_name_map
+                            instructor_name,
+                            instructor_rcsid_name_map,
+                            generated_instructor_rcsid_name_map,
                         )
                     instructor_list[i] = instructor_rcsid
 
@@ -178,13 +197,13 @@ def main(
     with subject_code_name_map_path.open("r", encoding="utf-8") as f:
         subject_code_name_map = json.load(f)
 
-    # TODO: Create separate RCSID to name map for generated RCSIDs
+    # Initialize generated instructor RCSID map
+    generated_instructor_rcsid_name_map = {}
 
     processed_output_data_dir.mkdir(exist_ok=True, parents=True)
 
     # Process each term course data file
     for term_file in output_data_dir.glob("*.json"):
-        logging.info(f"Processing term course data file: {term_file}")
         with term_file.open("r", encoding="utf-8") as f:
             term_course_data = json.load(f)
 
@@ -192,12 +211,27 @@ def main(
             term_course_data,
             subject_code_name_map,
             instructor_rcsid_name_map,
+            generated_instructor_rcsid_name_map,
         )
 
         # Write processed data
         processed_file_path = processed_output_data_dir / term_file.name
+        logging.info(f"Writing processed data to {processed_file_path}")
         with processed_file_path.open("w", encoding="utf-8") as f:
             json.dump(term_course_data, f, indent=4, ensure_ascii=False)
-        logging.info(f"Wrote processed data to {processed_file_path}")
+
+    # Write generated instructor RCSID map
+    if len(generated_instructor_rcsid_name_map) > 0:
+        generated_map_path = (
+            instructor_rcsid_name_map_path.parent
+            / "generated_instructor_rcsid_name_map.json"
+        )
+        logging.info(
+            f"Writing generated instructor RCSID name map to {generated_map_path}"
+        )
+        with generated_map_path.open("w", encoding="utf-8") as f:
+            json.dump(
+                generated_instructor_rcsid_name_map, f, indent=4, ensure_ascii=False
+            )
 
     return True

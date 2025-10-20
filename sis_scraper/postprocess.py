@@ -6,6 +6,15 @@ from typing import Any
 
 
 def codify_course_code(course_code: str, subject_code_name_map: dict[str, str]) -> str:
+    """
+    Codifies a course code from its full subject name and number to its subject code and
+    number. For example, "Computer Science 1010" becomes "CSCI 1010".
+
+    @param course_code: The course code in the format `[Subject Name] [Course Number]`.
+    @param subject_code_name_map: A mapping of subject codes to subject full names.
+    @return: The codified course code in the format `[Subject Code] [Course Number]`, \
+        or the original course code if the format is invalid.
+    """
     course_pattern = r"(.+) (\d{4})"
     match = re.match(course_pattern, course_code)
     if match is None or len(match.groups()) != 2:
@@ -24,6 +33,14 @@ def codify_course_code(course_code: str, subject_code_name_map: dict[str, str]) 
 
 
 def codify_attribute(attribute: str) -> str:
+    """
+    Codifies an attribute from its full name and code to just its code. For example,
+    "Writing Intensive  WI" becomes "WI".
+
+    @param attribute: The attribute in the format `[Attribute Name]  [Attribute Code]`.
+    @return: The codified attribute code, or the original attribute if the format is \
+        invalid.
+    """
     attribute_pattern = r"(.+)  (.+)"
     match = re.match(attribute_pattern, attribute)
     if match is None or len(match.groups()) != 2:
@@ -34,6 +51,15 @@ def codify_attribute(attribute: str) -> str:
 
 
 def codify_restriction(restriction: str) -> str:
+    """
+    Codifies a restriction from its full name and code to just its code. For example,
+    "Graduate (GR)" becomes "GR".
+
+    @param restriction: The restriction in the format \
+        `[Restriction Name] ([Restriction Code])`.
+    @return: The codified restriction code, or the original restriction if the format \
+        is invalid.
+    """
     restriction_pattern = r"(.+)\s*\((.+)\)"
     match = re.match(restriction_pattern, restriction)
     if match is None or len(match.groups()) != 2:
@@ -51,6 +77,12 @@ def generate_rcsid(
     """
     Accepts an instructor name in the format `Last, First` and generates an RCSID.
     Assumes the instructor name does not have an associated RCSID in the SIS data.
+
+    @param instructor_name: The instructor name in the format `Last, First`.
+    @param instructor_rcsid_name_map: A mapping of existing instructor RCSIDs to names.
+    @param generated_instructor_rcsid_name_map: A mapping to store newly generated \
+        instructor RCSIDs to names.
+    @return: The generated RCSID for the instructor.
     """
     instructor_name_pattern = r"(.+), (.+)"
     match = re.match(instructor_name_pattern, instructor_name)
@@ -92,12 +124,23 @@ def post_process(
     instructor_rcsid_name_map: dict[str, str],
     generated_instructor_rcsid_name_map: dict[str, str],
 ) -> None:
+    """
+    Post-process the term course data by codifying course codes, attributes,
+    restrictions, and instructor RCSIDs.
+
+    @param term_course_data: The term course data to post-process.
+    @param subject_code_name_map: A mapping of subject codes to subject full names.
+    @param instructor_rcsid_name_map: A mapping of existing instructor RCSIDs to names.
+    @param generated_instructor_rcsid_name_map: A mapping to store newly generated \
+        instructor RCSIDs to names.
+    @return: None
+    """
     for _, subject_data in term_course_data.items():
         subject_courses = subject_data["courses"]
         for _, course_data in subject_courses.items():
             course_detail = course_data["course_detail"]
             course_corequisites = course_detail["corequisite"]
-            course_prerequisites = course_detail["prerequisite"]
+            # course_prerequisites = course_detail["prerequisite"]
             course_crosslists = course_detail["crosslist"]
             course_attributes = course_detail["attributes"]
             course_restriction_types = course_detail["restrictions"]
@@ -160,6 +203,20 @@ def main(
     restriction_code_name_map_path: Path | str,
     subject_code_name_map_path: Path | str,
 ) -> bool:
+    """
+    Runs post-processing on the raw output data from the SIS scraper. This includes
+    codifying course codes, attributes, restrictions, and instructor RCSIDs.
+
+    @param output_data_dir: Directory containing raw output data from the SIS scraper.
+    @param processed_output_data_dir: Directory to write processed output data to.
+    @param attribute_code_name_map_path: Path to the attribute code-name mapping file.
+    @param instructor_rcsid_name_map_path: Path to the instructor RCSID-name mapping
+        file.
+    @param restriction_code_name_map_path: Path to the restriction code-name mapping
+        file.
+    @param subject_code_name_map_path: Path to the subject code-name mapping file.
+    @return: True if post-processing was successful, False otherwise.
+    """
     # Validate input directories
     if not all(
         (

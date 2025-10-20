@@ -5,8 +5,11 @@ import os
 import sys
 from pathlib import Path
 
+import argparse
+
 from dotenv import load_dotenv
 
+import postprocess
 import sis_scraper
 
 
@@ -86,11 +89,30 @@ def logging_init(logs_dir: Path | str, log_level: int = logging.INFO) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python -m sis_scraper <start_year> <end_year>")
-        sys.exit(1)
-    start_year = int(sys.argv[1])
-    end_year = int(sys.argv[2])
+    parser = argparse.ArgumentParser(
+        description="Scrape and process course data from the RPI SIS."
+    )
+    parser.add_argument(
+        "start_year", type=int, help="The year at which to start scraping from."
+    )
+    parser.add_argument(
+        "end_year", type=int, help="The year at which to stop scraping, inclusive."
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--scrape-only",
+        action="store_true",
+        help="Only run the scraping step.",
+    )
+    group.add_argument(
+        "--postprocess-only",
+        action="store_true",
+        help="Only run the postprocessing step.",
+    )
+    args = parser.parse_args()
+
+    start_year = args.start_year
+    end_year = args.end_year
 
     # Load environment variables from .env file if it exists
     load_dotenv()
@@ -127,14 +149,26 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logging_init(logs_dir, log_level=logging.INFO)
-    asyncio.run(
-        sis_scraper.main(
+
+    if not args.postprocess_only:
+        asyncio.run(
+            sis_scraper.main(
+                output_data_dir=output_data_dir,
+                start_year=start_year,
+                end_year=end_year,
+                attribute_code_name_map_path=attribute_code_name_map_path,
+                instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
+                restriction_code_name_map_path=restriction_code_name_map_path,
+                subject_code_name_map_path=subject_code_name_map_path,
+            )
+        )
+
+    if not args.scrape_only:
+        postprocess.main(
             output_data_dir=output_data_dir,
-            start_year=start_year,
-            end_year=end_year,
+            processed_output_data_dir=processed_data_dir,
             attribute_code_name_map_path=attribute_code_name_map_path,
             instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
             restriction_code_name_map_path=restriction_code_name_map_path,
             subject_code_name_map_path=subject_code_name_map_path,
         )
-    )

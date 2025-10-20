@@ -60,13 +60,26 @@ def generate_rcsid(
     # An RCSID is composed of up to the first 5 letters of the last name, followed by
     # the first name initial, as well as a number if needed to ensure uniqueness.
     # For example, "Doe, John" would become "doej", or "doej2" if "doej" is taken.
-    last_name = match.group(1)[:5].lower()
-    first_name = match.group(2)[0].lower()
-    rcsid = f"{last_name}{first_name}"
+    last_name = match.group(1)
+    last_name_component = ""
+    # Extract up to first 5 alphabetic characters from last name
+    for char in last_name:
+        if char.isalpha():
+            last_name_component += char.lower()
+        if len(last_name_component) == 5:
+            break
+    first_name = match.group(2)
+    # Extract first alphabetic character from first name
+    first_name_initial = ""
+    for char in first_name:
+        if char.isalpha():
+            first_name_initial += char.lower()
+            break
+    rcsid = f"{last_name_component}{first_name_initial}"
     # Ensure uniqueness
     counter = 1
     while rcsid in instructor_rcsid_name_map:
-        rcsid = f"{last_name}{first_name}{counter}"
+        rcsid = f"{last_name_component}{first_name_initial}{counter}"
         counter += 1
     # The generated RCSID may already exist in the generated map, this is normal
     generated_instructor_rcsid_name_map[rcsid] = instructor_name

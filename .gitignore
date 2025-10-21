@@ -181,4 +181,5 @@ logs/
 data/
 scraper_data/
 processed_data/
+code_mappings/
 .env

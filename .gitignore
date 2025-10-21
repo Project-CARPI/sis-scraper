@@ -177,7 +177,9 @@ cython_debug/
 .vscode/
 
 # Project Specific
-data
-quacs_sql_conversion/data_insertion_sql
-sql_db_setup/auth.json
+logs/
+data/
+scraper_data/
+processed_data/
+code_mappings/
 .env

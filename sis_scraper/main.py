@@ -113,18 +113,28 @@ if __name__ == "__main__":
     start_year = args.start_year
     end_year = args.end_year
 
+    # Ensure script has a valid parent directory
+    parent_dir = Path(__file__).parent
+    if parent_dir == Path(__file__):
+        print(
+            "ERROR: Could not determine this script's parent directory. "
+            "Ensure that the script is not being run from within a zip file."
+        )
+        sys.exit(1)
+
     # Load environment variables from .env file if it exists
-    load_dotenv()
+    if not load_dotenv():
+        print(
+            "ERROR: No environment variables found. Ensure that an .env file exists in "
+            "the same directory as this script and that all required variables are set."
+        )
+        sys.exit(1)
 
     try:
-        logs_dir = Path(__file__).parent / os.getenv("SCRAPER_LOGS_DIR")
-        output_data_dir = Path(__file__).parent / os.getenv(
-            "SCRAPER_RAW_OUTPUT_DATA_DIR"
-        )
-        processed_data_dir = Path(__file__).parent / os.getenv(
-            "SCRAPER_PROCESSED_OUTPUT_DATA_DIR"
-        )
-        code_maps_dir = Path(__file__).parent / os.getenv("SCRAPER_CODE_MAPS_DIR")
+        logs_dir = parent_dir / os.getenv("SCRAPER_LOGS_DIR")
+        output_data_dir = parent_dir / os.getenv("SCRAPER_RAW_OUTPUT_DATA_DIR")
+        processed_data_dir = parent_dir / os.getenv("SCRAPER_PROCESSED_OUTPUT_DATA_DIR")
+        code_maps_dir = parent_dir / os.getenv("SCRAPER_CODE_MAPS_DIR")
         attribute_code_name_map_path = code_maps_dir / os.getenv(
             "ATTRIBUTE_CODE_NAME_MAP_FILENAME"
         )
@@ -139,12 +149,9 @@ if __name__ == "__main__":
         )
     except TypeError as e:
         print(
-            "ERROR: One or more required environment variables are not set."
-            " Ensure that an .env file exists with all required variables."
+            "ERROR: One or more required environment variables are not set. "
+            "Ensure all required variables are set in the .env file."
         )
-        import traceback
-
-        traceback.print_exc()
         sys.exit(1)
 
     logging_init(logs_dir, log_level=logging.INFO)

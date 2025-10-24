@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import datetime as dt
 import logging
@@ -5,11 +6,9 @@ import os
 import sys
 from pathlib import Path
 
-import argparse
-
+import postprocess
 from dotenv import load_dotenv
 
-import postprocess
 import sis_scraper
 
 

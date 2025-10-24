@@ -342,7 +342,8 @@ async def get_term_course_data(
     @param timeout: Timeout in seconds for all requests made by a session.
     @return: None
     """
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=timeout)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         subjects = await get_term_subjects(session, term)
 
     # Build subject code to name map

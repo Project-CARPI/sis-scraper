@@ -55,8 +55,8 @@ async def get_term_subjects(
     session: aiohttp.ClientSession, term: str
 ) -> list[dict[str, str]]:
     """
-    Fetches the list of subjects and codes for a given term from SIS. If the term is
-    invalid or doesn't exist, returns an empty list.
+    Fetches the list of subjects and codes for a given term from SIS. If the
+    term is invalid or doesn't exist, returns an empty list.
 
     Returned data format is as follows:
     ```
@@ -83,8 +83,8 @@ async def get_term_instructors(
     session: aiohttp.ClientSession, term: str
 ) -> list[dict[str, str]]:
     """
-    Fetches the list of instructors for a given term from SIS. If the term is invalid
-    or doesn't exist, returns an empty list.
+    Fetches the list of instructors for a given term from SIS. If the term is
+    invalid or doesn't exist, returns an empty list.
 
     Returned data format is as follows:
     ```
@@ -113,9 +113,9 @@ async def get_all_attributes(
     """
     Fetches the master list of attributes from SIS.
 
-    Note that this is not actually a comprehensive list of all attributes used by
-    courses. For example, "FRSH" and "ONLI" are known attributes that are missing
-    from this list.
+    Note that this is not actually a comprehensive list of all attributes used
+    by courses. For example, "FRSH" and "ONLI" are known attributes that are
+    missing from this list.
 
     Returned data format is as follows:
     ```
@@ -142,8 +142,8 @@ async def get_all_colleges(
     session: aiohttp.ClientSession, search_term: str = ""
 ) -> list[dict[str, str]]:
     """
-    Fetches the master list of colleges (schools) and codes from SIS. Not to be confused
-    with campuses.
+    Fetches the master list of colleges (schools) and codes from SIS. Not to be
+    confused with campuses.
 
     Returned data format is as follows:
     ```
@@ -170,8 +170,8 @@ async def get_all_campuses(
     session: aiohttp.ClientSession, search_term: str = ""
 ) -> list[dict[str, str]]:
     """
-    Fetches the master list of campuses and codes from SIS. Not to be confused with
-    colleges (schools).
+    Fetches the master list of campuses and codes from SIS. Not to be confused
+    with colleges (schools).
 
     Returned data format is as follows:
     ```
@@ -198,9 +198,10 @@ async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
     """
     Resets the term and subject search state on the SIS server.
 
-    Must be called before each attempt to fetch classes from a subject in the given term.
-    Otherwise, the server will continue returning the same results from the last subject
-    accessed, or no data if attempting to access data from a different term.
+    Must be called before each attempt to fetch classes from a subject in the
+    given term. Otherwise, the server will continue returning the same results
+    from the last subject accessed, or no data if attempting to access data
+    from a different term.
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/term/search?mode=search"
     params = {"term": term}
@@ -219,13 +220,14 @@ async def class_search(
     """
     Fetches the list of classes for a given subject and term from SIS.
 
-    The term and subject search state on the SIS server must be reset before each call
-    to this function.
+    The term and subject search state on the SIS server must be reset before
+    each call to this function.
 
     Returned data format is very large; see docs for details.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/searchResults?pageOffset=0"
+    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/searchResults"
     params = {
+        "pageOffset": 0,
         "txt_subject": subject,
         "txt_term": term,
         "pageMaxSize": max_size,
@@ -247,10 +249,12 @@ async def get_class_description(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> str:
     """
-    Fetches and parses data from the "Course Description" tab of a class details page.
+    Fetches and parses data from the "Course Description" tab of a class
+    details page.
 
-    Returns a string containing the course description, without any additional fields
-    such as "When Offered", "Credit Hours", "Prerequisite", etc.
+    Returns a string containing the course description, without any
+    additional fields such as "When Offered", "Credit Hours", "Prerequisite",
+    etc.
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCourseDescription"
     params = {"term": term, "courseReferenceNumber": crn}
@@ -303,7 +307,8 @@ async def get_class_attributes(
 
 async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn: str):
     """
-    Fetches and parses data from the "Restrictions" tab of a class details page.
+    Fetches and parses data from the "Restrictions" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -347,7 +352,10 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     }
     restrictions_tag = soup.find("section", {"aria-labelledby": "restrictions"})
     escaped_keys = [re.escape(key) for key in RESTRICTION_TYPE_MAP.keys()]
-    restriction_header_pattern = rf"(Must|Cannot) be enrolled in one of the following ({'|'.join(escaped_keys)}):"
+    restriction_header_pattern = (
+        r"(Must|Cannot) be enrolled in one of the following "
+        f"({'|'.join(escaped_keys)}):"
+    )
     # "Special Approvals:" is the only other known header pattern
     special_approvals_pattern = r"Special Approvals:"
     # All known children of the restrictions section are <div>, <span<>, or <br> tags
@@ -362,7 +370,8 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         content = restrictions_content[i]
         if content.string is None:
             logging.warning(
-                f"Skipping unexpected restriction content with no string for term and CRN: {term} - {crn}"
+                "Skipping unexpected restriction content with no string for "
+                f"CRN {crn} in term {term}"
             )
             i += 1
             continue
@@ -386,7 +395,8 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             next_content = restrictions_content[i]
             if next_content.string is None:
                 logging.warning(
-                    f"Skipping unexpected restriction content with no string for term and CRN: {term} - {crn}"
+                    f"Skipping unexpected restriction content with no string for "
+                    f"CRN {crn} in term {term}"
                 )
                 i += 1
                 continue
@@ -419,7 +429,8 @@ async def get_class_prerequisites(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> dict[str, Any]:
     """
-    Fetches and parses data from the "Prerequisites" tab of a class details page.
+    Fetches and parses data from the "Prerequisites" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -472,7 +483,8 @@ async def get_class_prerequisites(
     #         return parse_prereq(term, crn, data)
     #     except Exception as e:
     #         logging.error(
-    #             f"Error parsing prerequisites for CRN {crn} in term {term} with data: {data}\n{e}"
+    #             f"Error parsing prerequisites for CRN {crn} in term {term} "
+    #             f"with data: {data}\n{e}"
     #         )
     #         import traceback
 
@@ -486,7 +498,8 @@ async def get_class_corequisites(
     crn: str,
 ):
     """
-    Fetches and parses data from the "Corequisites" tab of a class details page.
+    Fetches and parses data from the "Corequisites" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -518,7 +531,7 @@ async def get_class_corequisites(
     # Known corequisite columns are Subject, Course, and Title
     if len(thead_cols) != 3:
         logging.warning(
-            f"Unexpected number of corequisite columns for term and CRN: {term} - {crn}"
+            f"Unexpected number of corequisite columns for CRN {crn} in term {term}"
         )
         return []
     coreqs = []
@@ -526,7 +539,8 @@ async def get_class_corequisites(
         cols = [td.text.strip() for td in tr.find_all("td")]
         if len(cols) != len(thead_cols):
             logging.warning(
-                f"Skipping unexpected corequisite row with mismatched columns for term and CRN: {term} - {crn}"
+                f"Skipping unexpected corequisite row with mismatched columns for "
+                f"CRN {crn} in term {term}"
             )
             continue
         subject = cols[0]
@@ -541,7 +555,8 @@ async def get_class_crosslists(
     crn: str,
 ):
     """
-    Fetches and parses data from the "Cross Listed" tab of a class details page.
+    Fetches and parses data from the "Cross Listed" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -581,7 +596,8 @@ async def get_class_crosslists(
         cols = [td.text.strip() for td in tr.find_all("td")]
         if len(cols) != len(thead_cols):
             logging.warning(
-                f"Skipping unexpected crosslist row with mismatched columns for term and CRN: {term} - {crn}"
+                f"Skipping unexpected crosslist row with mismatched columns for "
+                f"CRN {crn} in term {term}"
             )
             continue
         subject = cols[1]

@@ -16,8 +16,8 @@ class ColoredFormatter(logging.Formatter):
     """
     Simple wrapper class that adds colors to logging.
 
-    Requires a format, and otherwise accepts any keyword arguments that are accepted by
-    logging.Formatter().
+    Requires a format, and otherwise accepts any keyword arguments that are
+    accepted by logging.Formatter().
     """
 
     def __init__(self, fmt: str, **kwargs):
@@ -42,8 +42,8 @@ class ColoredFormatter(logging.Formatter):
 
 def logging_init(logs_dir: Path | str, log_level: int = logging.INFO) -> None:
     """
-    Initializes logging settings once on startup; these settings determine the behavior
-    of all logging calls within this program.
+    Initializes logging settings once on startup; these settings determine the
+    behavior of all logging calls within this program.
     """
     if logs_dir is None:
         raise ValueError("logs_dir must be specified")

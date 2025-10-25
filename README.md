@@ -25,9 +25,7 @@ Course information included in the output data include:
 - Section instructors (and RCSIDs)
 - Seat data (capacity, registered, and open)
 
-## Using the SIS Scraper
-
-_The scraper requires **Python >= 3.11** to run._
+## About the SIS Scraper
 
 There are two distinct steps that take place within the SIS scraper:
 
@@ -39,7 +37,13 @@ The postprocess step operates on the JSON data outputted by the scraper and codi
 
 _The postprocess step is tailored to the needs of Project CARPI, so the resulting data format may not be desirable for general use._
 
-To run the SIS scraper, it's as simple as running the `main.py` script within the `sis_scraper` directory of this repository. Optional flags `--scrape-only` and `--postprocess-only` may be specified to disable a step of the scraper.
+## Running the SIS Scraper
+
+_The scraper requires Python >= 3.11 to run._
+
+Create a `.env` file in the `sis_scraper` directory where the `main.py` script is. An `example.env` script has been provided in the repository for reference; you may simply copy-paste the contents to use default values.
+
+Running the SIS scraper is as simple as running `main.py`. Optional flags `--scrape-only` and `--postprocess-only` may be specified to disable a step of the scraper.
 
 **Windows**
 

@@ -59,6 +59,8 @@ cd sis_scraper
 python3 main.py [--scrape-only | --postprocess-only] start_year end_year
 ```
 
+Once the scraper is running, logs will be displayed in the console as well as written to disk. The log directory by default is located in the directory of the main script. Running time of the scraper may vary heavily depending on the number of terms being scraped and external server or network factors not within the scraper's control.
+
 ## Sample Output JSON Format
 
 ```json

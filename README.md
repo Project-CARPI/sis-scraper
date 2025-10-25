@@ -43,9 +43,9 @@ _The scraper requires Python >= 3.11 to run._
 
 ### 1. Installing Required Dependencies
 
-**The scraper requires Python >= 3.11 to run.** If you don't have an appropriate version of Python already, [download and install one from the official website.](https://python.org/)
+**The scraper requires Python >= 3.11 to run.** If you don't have an appropriate version of Python already, [download and install one from the official website.](https://www.python.org/)
 
-> **Recommended:** If you don't want to clutter the global pip package space, you may optionally create a virtual environment in the project root and activate it:
+> **Recommended:** If you don't want to clutter the global Python package space on your computer, you can optionally create a virtual environment in the project root and activate it in order to keep packages scoped to this scraper only.
 >
 > **Windows**
 >
@@ -71,7 +71,7 @@ pip install -r requirements.txt
 
 Create a new file in the `sis_scraper` directory named `.env`. An `example.env` script has been provided in the directory for reference; you may simply copy-paste the contents to use default values.
 
-The file contains variables for configuring output directories and code mapping filenames. You may edit these to your liking.
+The file contains variables for configuring output directories and code mapping filenames. You may optionally edit these to your liking.
 
 ```
 SCRAPER_LOGS_DIR="logs"

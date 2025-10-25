@@ -41,9 +41,54 @@ _The postprocess step is tailored to the needs of Project CARPI, so the resultin
 
 _The scraper requires Python >= 3.11 to run._
 
-Create a `.env` file in the `sis_scraper` directory where the `main.py` script is. An `example.env` script has been provided in the repository for reference; you may simply copy-paste the contents to use default values.
+### 1. Installing Required Dependencies
 
-Running the SIS scraper is as simple as running `main.py`. Optional flags `--scrape-only` and `--postprocess-only` may be specified to disable a step of the scraper.
+**The scraper requires Python >= 3.11 to run.** If you don't have an appropriate version of Python already, [download and install one from the official website.](https://python.org/)
+
+> **Recommended:** If you don't want to clutter the global pip package space, you may optionally create a virtual environment in the project root and activate it:
+>
+> **Windows**
+>
+> ```powershell
+> python.exe -m venv .venv
+> .venv\Scripts\activate
+> ```
+>
+> **MacOS/Unix**
+>
+> ```bash
+> python3 -m venv .venv
+> source .venv/bin/activate
+> ```
+
+From the project root, install the required dependencies using the following command:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Creating the .env File
+
+Create a new file in the `sis_scraper` directory named `.env`. An `example.env` script has been provided in the directory for reference; you may simply copy-paste the contents to use default values.
+
+The file contains variables for configuring output directories and code mapping filenames. You may edit these to your liking.
+
+```
+SCRAPER_LOGS_DIR="logs"
+SCRAPER_CODE_MAPS_DIR="code_mappings"
+
+SCRAPER_RAW_OUTPUT_DATA_DIR="scraper_data"
+SCRAPER_PROCESSED_OUTPUT_DATA_DIR="processed_data"
+
+ATTRIBUTE_CODE_NAME_MAP_FILENAME="attribute_code_name_map.json"
+INSTRUCTOR_RCSID_NAME_MAP_FILENAME="instructor_rcsid_name_map.json"
+RESTRICTION_CODE_NAME_MAP_FILENAME="restriction_code_name_map.json"
+SUBJECT_CODE_NAME_MAP_FILENAME="subject_code_name_map.json"
+```
+
+### 3. Running the Script
+
+Run `main.py` using one of the commands below. Optional flags `--scrape-only` and `--postprocess-only` may be specified to disable a step of the scraper.
 
 **Windows**
 

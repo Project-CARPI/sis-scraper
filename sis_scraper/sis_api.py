@@ -8,8 +8,6 @@ from typing import Any
 import aiohttp
 import bs4
 
-# from prereq_parser import parse_prereq
-
 RESTRICTION_TYPE_MAP = {
     "Majors": "major",
     "Fields of Study (Major, Minor or Concentration)": "major",
@@ -21,6 +19,7 @@ RESTRICTION_TYPE_MAP = {
     "Departments": "department",
     "Campuses": "campus",
     "Colleges": "college",
+    "Special Approvals": "special_approval",
 }
 
 
@@ -331,25 +330,16 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         raw_data = await response.text()
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
-    restrictions_data = {
-        "major": [],
-        "not_major": [],
-        "minor": [],
-        "not_minor": [],
-        "level": [],
-        "not_level": [],
-        "classification": [],
-        "not_classification": [],
-        "degree": [],
-        "not_degree": [],
-        "department": [],
-        "not_department": [],
-        "campus": [],
-        "not_campus": [],
-        "college": [],
-        "not_college": [],
-        "special_approval": [],
-    }
+    # Dynamically build restrictions_data dict structure from RESTRICTION_TYPE_MAP values
+    restrictions_data = {}
+    bases = set(RESTRICTION_TYPE_MAP.values())
+    for base in sorted(bases):
+        # Skip the special_approval key as it is handled separately
+        if base == "special_approval":
+            continue
+        restrictions_data[base] = []
+        restrictions_data[f"not_{base}"] = []
+    restrictions_data["special_approval"] = []
     restrictions_tag = soup.find("section", {"aria-labelledby": "restrictions"})
     escaped_keys = [re.escape(key) for key in RESTRICTION_TYPE_MAP.keys()]
     restriction_header_pattern = (
@@ -386,8 +376,14 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             restriction_list = restrictions_data["special_approval"]
         else:
             must_or_cannot, type_plural = header_match.groups()
+            if type_plural not in RESTRICTION_TYPE_MAP:
+                logging.warning(
+                    f"Unknown restriction type '{type_plural}' for CRN {crn} in term {term}"
+                )
+                i += 1
+                continue
             key_base = RESTRICTION_TYPE_MAP[type_plural]
-            key = f"not_{key_base}" if must_or_cannot == "Cannot" else key_base
+            key = f"not_{key_base}" if must_or_cannot.lower() == "cannot" else key_base
             restriction_list = restrictions_data[key]
         i += 1
         next_content_string = ""

@@ -54,7 +54,7 @@ The postprocess step is tailored to the needs of Project CARPI, so the resulting
 > ```powershell
 > # Create a virtual environment in the current directory
 > python.exe -m venv .venv
-> # Activate the environment
+> # Enter/activate the environment
 > .venv\Scripts\activate
 > ```
 >
@@ -63,11 +63,25 @@ The postprocess step is tailored to the needs of Project CARPI, so the resulting
 > ```bash
 > # Create a virtual envrionment in the current directory
 > python3 -m venv .venv
-> # Activate the environment
+> # Enter/activate the environment
 > source .venv/bin/activate
 > ```
+>
+> You'll know whether you're in the virtual environment based on if a prefix appears in your command prompt.
+>
+> ```bash
+> # Note the (.venv)
+> (.venv) raymond@Macbook-Pro sis_scraper %
+> ```
+>
+> To exit/deactivate the virtual environment, simply run the deactivate command.
+>
+> ```bash
+> (.venv) raymond@Macbook-Pro sis_scraper % deactivate
+> raymond@Macbook-Pro sis_scraper %
+> ```
 
-From the project root, run the command below. This will install the required dependencies into your global Python package space or the virtual environment space, depending on whether you followed the steps above.
+From the project root, run the command below to install the required dependencies.
 
 ```bash
 # Install all packages listed in requirements.txt

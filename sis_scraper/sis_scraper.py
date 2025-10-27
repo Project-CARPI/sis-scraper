@@ -279,10 +279,10 @@ async def get_course_data(
         connector = aiohttp.TCPConnector(
             ttl_dns_cache=500, limit_per_host=limit_per_host
         )
-        timeout = aiohttp.ClientTimeout(total=timeout)
+        timeout_obj = aiohttp.ClientTimeout(total=timeout)
 
         async with aiohttp.ClientSession(
-            connector=connector, timeout=timeout
+            connector=connector, timeout=timeout_obj
         ) as session:
             try:
                 # Reset search state on server before fetching class data
@@ -342,8 +342,8 @@ async def get_term_course_data(
     @param timeout: Timeout in seconds for all requests made by a session.
     @return: None
     """
-    timeout = aiohttp.ClientTimeout(total=timeout)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    timeout_obj = aiohttp.ClientTimeout(total=timeout)
+    async with aiohttp.ClientSession(timeout=timeout_obj) as session:
         subjects = await get_term_subjects(session, term)
 
     # Build subject code to name map

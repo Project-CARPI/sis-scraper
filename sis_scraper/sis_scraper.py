@@ -131,7 +131,7 @@ async def process_class_details(
                 attribute_split = attribute.split()
                 if len(attribute_split) < 2:
                     logging.warning(
-                        f"Unexpected attribute format for CRN {crn} "
+                        f"Skipping unexpected attribute format for CRN {crn} "
                         f"in term {term}: {attribute}"
                     )
                     continue
@@ -149,8 +149,8 @@ async def process_class_details(
                 attribute_code_name_map[attribute_code] = attribute_name
 
         # Build restriction code to name map
-        # Restrictions are known to be in the format "Restriction Name (CODE)"
-        # Note the parentheses around the code
+        # Restrictions are known to be in the format "Restriction Name (CODE)" except
+        # for special approvals, which are handled explicitly as a special case.
         if restriction_code_name_map is not None:
             restriction_pattern = r"(.*)\((.*)\)"
             for restriction_type in restrictions_data:
@@ -160,10 +160,7 @@ async def process_class_details(
                 for restriction in restrictions_data[restriction_type]:
                     restriction_match = re.match(restriction_pattern, restriction)
                     if restriction_match is None or len(restriction_match.groups()) < 2:
-                        logging.warning(
-                            f"Unexpected restriction format for CRN {crn} "
-                            f"in term {term}: {restriction}"
-                        )
+                        # Skip unexpected restriction formats or special approvals
                         continue
                     restriction_name = restriction_match.group(1).strip()
                     restriction_code = restriction_match.group(2).strip()

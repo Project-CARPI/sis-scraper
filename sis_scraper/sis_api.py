@@ -8,6 +8,8 @@ from typing import Any
 import aiohttp
 import bs4
 
+# Restriction data structure is dynamically generated based on values in this dictionary,
+# except for "Special Approvals", which is handled explicitly as a special case.
 RESTRICTION_TYPE_MAP = {
     "Majors": "major",
     "Fields of Study (Major, Minor or Concentration)": "major",
@@ -334,12 +336,11 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     restrictions_data = {}
     bases = set(RESTRICTION_TYPE_MAP.values())
     for base in sorted(bases):
-        # Skip the special_approval key as it is handled separately
+        restrictions_data[base] = []
+        # There is no "not_" key for "special_approval"
         if base == "special_approval":
             continue
-        restrictions_data[base] = []
         restrictions_data[f"not_{base}"] = []
-    restrictions_data["special_approval"] = []
     restrictions_tag = soup.find("section", {"aria-labelledby": "restrictions"})
     escaped_keys = [re.escape(key) for key in RESTRICTION_TYPE_MAP.keys()]
     restriction_header_pattern = (
@@ -372,13 +373,18 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         if header_match is None:
             i += 1
             continue
+        # Special case for "Special Approvals:"
         if len(header_match.groups()) == 0:
+            if "special_approval" not in restrictions_data:
+                i += 1
+                continue
             restriction_list = restrictions_data["special_approval"]
         else:
             must_or_cannot, type_plural = header_match.groups()
             if type_plural not in RESTRICTION_TYPE_MAP:
                 logging.warning(
-                    f"Unknown restriction type '{type_plural}' for CRN {crn} in term {term}"
+                    f"Skipping unknown restriction type '{type_plural}' for CRN {crn} "
+                    f"in term {term}"
                 )
                 i += 1
                 continue
@@ -405,7 +411,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             # <span>Communication</span>
             # <span>Media</span>
             # <span> & Design (COMD)</span>
-            if next_content_string == "":
+            if len(next_content_string) == 0:
                 next_content_string = next_content.string.lstrip()
             else:
                 next_content_string += f",{next_content.string}"
@@ -414,7 +420,9 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
                 special_approvals_pattern, next_content_string
             ):
                 break
-            if re.match(r".*\(.*\)", next_content_string):
+            if restriction_list is restrictions_data["special_approval"] or re.match(
+                r".*\(.*\)", next_content_string
+            ):
                 restriction_list.append(next_content_string.strip())
                 next_content_string = ""
             i += 1

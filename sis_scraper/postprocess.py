@@ -169,6 +169,9 @@ def post_process(
 
             # Restrictions
             for restriction_type in course_restriction_types:
+                # Skip special approvals
+                if restriction_type == "special_approval":
+                    continue
                 restriction_type_list = course_restriction_types[restriction_type]
                 for i, restriction in enumerate(restriction_type_list):
                     restriction_type_list[i] = codify_restriction(restriction)

@@ -50,20 +50,25 @@ _The scraper requires Python >= 3.11 to run._
 > **Windows**
 >
 > ```powershell
+> # Create a virtual environment in the current directory
 > python.exe -m venv .venv
+> # Activate the environment
 > .venv\Scripts\activate
 > ```
 >
 > **MacOS/Unix**
 >
 > ```bash
+> # Create a virtual envrionment in the current directory
 > python3 -m venv .venv
+> # Activate the environment
 > source .venv/bin/activate
 > ```
 
 From the project root, install the required dependencies using the following command:
 
 ```bash
+# Install all packages listed in requirements.txt
 pip install -r requirements.txt
 ```
 
@@ -93,14 +98,18 @@ Run `main.py` using one of the commands below. Optional flags `--scrape-only` an
 **Windows**
 
 ```powershell
+# Navigate to the sis_scraper directory
 cd sis_scraper
+# Run the scraper from start_year to end_year
 python.exe main.py [--scrape-only | --postprocess-only] start_year end_year
 ```
 
 **MacOS/Unix**
 
 ```bash
+# Navigate to the sis_scraper directory
 cd sis_scraper
+# Run the scraper from start_year to end_year
 python3 main.py [--scrape-only | --postprocess-only] start_year end_year
 ```
 

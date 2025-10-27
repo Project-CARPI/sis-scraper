@@ -125,7 +125,7 @@ The output shown below does not accurately reflect real data; it is just meant t
             "CSCI 1100": {
                 "course_name": "Computer Science I",
                 "course_detail": {
-                    "description": "Course description.",
+                    "description": "An introduction to computer programming algorithm design and analysis.",
                     "corequisite": [
                         "SUBJ 1100",
                         "SUBJ 1200"
@@ -141,11 +141,12 @@ The output shown below does not accurately reflect real data; it is just meant t
                     ],
                     "restrictions": {
                         "major": [
-                            "Computer Science"
+                            "Computer Science (CSCI)",
+                            "Computer & Systems Engineering (CSYS)"
                         ],
                         "not_major": [],
                         "minor": [
-                            "Electronic Arts"
+                            "Electronic Arts (EART)"
                         ],
                         "not_minor": [],
                         "level": [
@@ -153,20 +154,20 @@ The output shown below does not accurately reflect real data; it is just meant t
                         ],
                         "not_level": [],
                         "classification": [
-                            "Freshman",
-                            "Sophomore"
+                            "Freshman (FR)",
+                            "Sophomore(SO)"
                         ],
                         "not_classification": [],
                         "degree": [
-                            ""
+                            "Doctor of Philosophy (PHD)"
                         ],
                         "not_degree": [],
                         "department": [
-                            ""
+                            "Architecture (ARCH)"
                         ],
                         "not_department": [],
                         "campus": [
-                            "Troy"
+                            "Troy (T)"
                         ],
                         "not_campus": [],
                         "college": [
@@ -183,23 +184,25 @@ The output shown below does not accurately reflect real data; it is just meant t
                     },
                     "sections": [
                         {
-                            "CRN": "12345",
+                            "CRN": "61891",
                             "instructor": [
-                                "rcsid1",
-                                "rcsid2"
+                                "Doe, John (doej)",
+                                "Jane, Mary (janem)",
+                                "Huffman, Stanton (Unknown RCSID)"
                             ],
                             "schedule": {},
                             "capacity": 30,
                             "registered": 29,
                             "open": 1
                         },
-                        ...
                     ]
                 }
             },
-            ...
         }
     },
-    ...
+    "ENGR": {
+        "subject_name": "Core Engineering",
+        "courses": {},
+    },
 ]
 ```

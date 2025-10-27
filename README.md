@@ -39,8 +39,6 @@ _The postprocess step is tailored to the needs of Project CARPI, so the resultin
 
 ## Running the SIS Scraper
 
-_The scraper requires Python >= 3.11 to run._
-
 ### 1. Installing Required Dependencies
 
 **The scraper requires Python >= 3.11 to run.** If you don't have an appropriate version of Python already, [download and install one from the official website.](https://www.python.org/)

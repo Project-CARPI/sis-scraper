@@ -1,3 +1,4 @@
+import asyncio
 import html
 import json
 import logging
@@ -7,6 +8,13 @@ from typing import Any
 
 import aiohttp
 import bs4
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random,
+    wait_random_exponential,
+)
 
 # from prereq_parser import parse_prereq
 
@@ -31,6 +39,33 @@ class ClassColumn(str, Enum):
     SECTION = "sequenceNumber"
     CRN = "courseReferenceNumber"
     TERM = "term"
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_random_exponential(multiplier=1.5) + wait_random(min=0, max=2),
+    retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)),
+    before_sleep=lambda retry_state: logging.warning(
+        f"Retrying failed request (attempt {retry_state.attempt_number})"
+    ),
+)
+async def retry_get(
+    session: aiohttp.ClientSession, url: str, params: dict[str, Any]
+) -> Any:
+    """
+    Helper function to perform an HTTP GET request and return the raw text
+    response, retrying up to 3 times on failure using exponential backoff and
+    jitter.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param url: The URL to send the GET request to.
+    @param params: A dictionary of query parameters to include in the request.
+    @return: The raw text response from the server.
+    """
+    async with session.get(url, params=params) as response:
+        response.raise_for_status()
+        raw_data = await response.text()
+    return raw_data
 
 
 def html_unescape(obj: Any) -> Any:
@@ -71,9 +106,7 @@ async def get_term_subjects(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_subject"
     params = {"term": term, "offset": 1, "max": 2147483647}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
     data = html_unescape(data)
     return data
@@ -99,9 +132,7 @@ async def get_term_instructors(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_instructor"
     params = {"term": term, "offset": 1, "max": 2147483647}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
     data = html_unescape(data)
     return data
@@ -130,9 +161,7 @@ async def get_all_attributes(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_attribute"
     params = {"searchTerm": search_term, "offset": 1, "max": 2147483647}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
     data = html_unescape(data)
     return data
@@ -158,9 +187,7 @@ async def get_all_colleges(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_college"
     params = {"searchTerm": search_term, "offset": 1, "max": 2147483647}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
     data = html_unescape(data)
     return data
@@ -186,9 +213,7 @@ async def get_all_campuses(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_campus"
     params = {"searchTerm": search_term}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
     data = html_unescape(data)
     return data
@@ -204,8 +229,7 @@ async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/term/search?mode=search"
     params = {"term": term}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
+    await retry_get(session, url, params)
 
 
 async def class_search(
@@ -232,9 +256,7 @@ async def class_search(
         "sortColumn": sort_column,
         "sortDirection": "asc" if sort_asc else "desc",
     }
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
     data = html_unescape(data)
     course_data = data["data"]
@@ -254,9 +276,7 @@ async def get_class_description(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCourseDescription"
     params = {"term": term, "courseReferenceNumber": crn}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     description_tag = soup.find("section", {"aria-labelledby": "courseDescription"})
@@ -289,9 +309,7 @@ async def get_class_attributes(
     """
     url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getSectionAttributes"
     params = {"term": term, "courseReferenceNumber": crn}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     attributes = []
@@ -321,9 +339,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getRestrictions"
     )
     params = {"term": term, "courseReferenceNumber": crn}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     restrictions_data = {
@@ -501,9 +517,7 @@ async def get_class_corequisites(
         "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCorequisites"
     )
     params = {"term": term, "courseReferenceNumber": crn}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     coreqs_tag = soup.find("section", {"aria-labelledby": "coReqs"})
@@ -556,9 +570,7 @@ async def get_class_crosslists(
         "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getXlstSections"
     )
     params = {"term": term, "courseReferenceNumber": crn}
-    async with session.get(url, params=params) as response:
-        response.raise_for_status()
-        raw_data = await response.text()
+    raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     crosslists_tag = soup.find("section", {"aria-labelledby": "xlstSections"})

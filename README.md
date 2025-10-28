@@ -197,7 +197,6 @@ The output shown below does not accurately reflect real data; it is just meant t
                                 "Jane, Mary (janem)",
                                 "Huffman, Stanton (Unknown RCSID)"
                             ],
-                            "schedule": {},
                             "capacity": 30,
                             "registered": 29,
                             "open": 1

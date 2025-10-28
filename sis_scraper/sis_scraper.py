@@ -225,7 +225,6 @@ async def process_class_details(
         {
             "CRN": class_entry["courseReferenceNumber"],
             "instructor": class_faculty_rcsids,
-            "schedule": {},
             "capacity": class_entry["maximumEnrollment"],
             "registered": class_entry["enrollment"],
             "open": class_entry["seatsAvailable"],

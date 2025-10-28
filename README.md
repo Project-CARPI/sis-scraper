@@ -10,13 +10,13 @@ This scraper is designed to fetch course data from any range of years and academ
 
 A JSON file is produced for every academic term processed; see [sample output JSON data format](#sample-output-json-format) for format details.
 
-Course information included in the output data include:
+Course information included in the output data includes:
 
-- Course code (e.g. CSCI 1100)
+- Course Code (e.g. CSCI 1100)
 - Name
 - Description
 - Corequisites
-- Prerequisites (with AND, OR relationships)
+- ~~Prerequisites (with AND, OR relationships)~~ (Currently WIP)
 - Crosslists
 - Attributes
 - Restrictions (with restriction types)
@@ -90,22 +90,9 @@ pip install -r requirements.txt
 
 ### 2. Creating the .env File
 
-Create a new file in the `sis_scraper` directory named `.env`. An `example.env` script has been provided in the directory for reference; you may simply copy-paste the contents to use default values.
+Create a new file in the `sis_scraper` directory named `.env`. An `example.env` file has been provided in the directory for reference; you may simply copy-paste the contents to use default values.
 
-The file contains variables for configuring output directories and code mapping filenames. You may optionally edit these to your liking.
-
-```
-SCRAPER_LOGS_DIR="logs"
-SCRAPER_CODE_MAPS_DIR="code_mappings"
-
-SCRAPER_RAW_OUTPUT_DATA_DIR="scraper_data"
-SCRAPER_PROCESSED_OUTPUT_DATA_DIR="processed_data"
-
-ATTRIBUTE_CODE_NAME_MAP_FILENAME="attribute_code_name_map.json"
-INSTRUCTOR_RCSID_NAME_MAP_FILENAME="instructor_rcsid_name_map.json"
-RESTRICTION_CODE_NAME_MAP_FILENAME="restriction_code_name_map.json"
-SUBJECT_CODE_NAME_MAP_FILENAME="subject_code_name_map.json"
-```
+The file contains variables for configuring output directories and code mapping filenames. You may optionally edit them to your liking.
 
 ### 3. Running the Script
 
@@ -147,19 +134,44 @@ The output shown below does not accurately reflect real data; it is just meant t
                 "course_detail": {
                     "description": "An introduction to computer programming algorithm design and analysis.",
                     "corequisite": [
-                        "SUBJ 1100",
-                        "SUBJ 1200"
+                        "Earth & Environmental Science 1100",
+                        "Physics 1101"
                     ],
                     "prerequisite": {},
                     "crosslist": [
-                        "SUBJ 2010",
-                        "SUBJ 2020"
+                        "Architecture 5100",
+                        "Electrical & Comp. Sys. Engr. 4480"
                     ],
                     "attributes": [
-                        "DI1",
-                        "FRSH"
+                        "Data Intensive I  DI1",
+                        "Introductory Level Course  FRSH"
                     ],
                     "restrictions": {
+                        "campus": [
+                            "Troy (T)"
+                        ],
+                        "not_campus": [],
+                        "classification": [
+                            "Freshman (FR)",
+                            "Sophomore(SO)"
+                        ],
+                        "not_classification": [],
+                        "college": [
+                            "School of Science (S)"
+                        ],
+                        "not_college": [],
+                        "degree": [
+                            "Doctor of Philosophy (PHD)"
+                        ],
+                        "not_degree": [],
+                        "department": [
+                            "Architecture (ARCH)"
+                        ],
+                        "not_department": [],
+                        "level": [
+                            "Graduate"
+                        ],
+                        "not_level": [],
                         "major": [
                             "Computer Science (CSCI)",
                             "Computer & Systems Engineering (CSYS)"
@@ -169,31 +181,6 @@ The output shown below does not accurately reflect real data; it is just meant t
                             "Electronic Arts (EART)"
                         ],
                         "not_minor": [],
-                        "level": [
-                            "Graduate"
-                        ],
-                        "not_level": [],
-                        "classification": [
-                            "Freshman (FR)",
-                            "Sophomore(SO)"
-                        ],
-                        "not_classification": [],
-                        "degree": [
-                            "Doctor of Philosophy (PHD)"
-                        ],
-                        "not_degree": [],
-                        "department": [
-                            "Architecture (ARCH)"
-                        ],
-                        "not_department": [],
-                        "campus": [
-                            "Troy (T)"
-                        ],
-                        "not_campus": [],
-                        "college": [
-                            "School of Science (S)"
-                        ],
-                        "not_college": [],
                         "special_approval": [
                             "Instructor's Approval"
                         ]

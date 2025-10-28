@@ -315,7 +315,7 @@ async def get_term_course_data(
     semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
     limit_per_host: int = 5,
     timeout: int = 60,
-) -> None:
+) -> bool:
     """
     Gets all course data for a given term, which includes all subjects in the
     term.
@@ -340,8 +340,12 @@ async def get_term_course_data(
     @return: None
     """
     timeout_obj = aiohttp.ClientTimeout(total=timeout)
-    async with aiohttp.ClientSession(timeout=timeout_obj) as session:
-        subjects = await get_term_subjects(session, term)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout_obj) as session:
+            subjects = await get_term_subjects(session, term)
+    except aiohttp.ClientError as e:
+        logging.error(f"Error fetching subjects for term {term}: {e}")
+        return False
 
     # Build subject code to name map
     if subject_code_name_map is not None:
@@ -364,26 +368,30 @@ async def get_term_course_data(
 
     # Process subjects in parallel, each with its own session
     tasks: list[asyncio.Task] = []
-    async with asyncio.TaskGroup() as tg:
-        for subject in subjects:
-            subject_code = subject["code"]
-            term_course_data[subject_code] = {
-                "subject_name": subject["description"],
-                "courses": {},
-            }
-            task = tg.create_task(
-                get_course_data(
-                    term,
-                    subject_code,
-                    instructor_rcsid_name_map=instructor_rcsid_name_map,
-                    restriction_code_name_map=restriction_code_name_map,
-                    attribute_code_name_map=attribute_code_name_map,
-                    semaphore=semaphore,
-                    limit_per_host=limit_per_host,
-                    timeout=timeout,
+    try:
+        async with asyncio.TaskGroup() as tg:
+            for subject in subjects:
+                subject_code = subject["code"]
+                term_course_data[subject_code] = {
+                    "subject_name": subject["description"],
+                    "courses": {},
+                }
+                task = tg.create_task(
+                    get_course_data(
+                        term,
+                        subject_code,
+                        instructor_rcsid_name_map=instructor_rcsid_name_map,
+                        restriction_code_name_map=restriction_code_name_map,
+                        attribute_code_name_map=attribute_code_name_map,
+                        semaphore=semaphore,
+                        limit_per_host=limit_per_host,
+                        timeout=timeout,
+                    )
                 )
-            )
-            tasks.append(task)
+                tasks.append(task)
+    except Exception as e:
+        logging.error(f"Error processing subjects for term {term}: {e}")
+        return False
 
     # Wait for all tasks to complete and gather results
     for i, subject in enumerate(subjects):
@@ -391,15 +399,21 @@ async def get_term_course_data(
         term_course_data[subject["code"]]["courses"] = course_data
 
     if len(term_course_data) == 0:
-        return
+        return False
 
     # Write all data for term to JSON file
     if isinstance(output_path, str):
         output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    logging.info(f"Writing data to {output_path}")
-    with output_path.open("w", encoding="utf-8") as f:
-        json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Writing data to {output_path}")
+        with output_path.open("w", encoding="utf-8") as f:
+            json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Error writing data to {output_path}: {e}")
+        return False
+
+    return True
 
 
 async def main(
@@ -552,6 +566,8 @@ async def main(
     logging.info(f"  Max concurrent sessions: {semaphore._value}")
     logging.info(f"  Max concurrent connections per session: {limit_per_host}")
 
+    tasks: list[asyncio.Task] = []
+    num_terms_processed = 0
     try:
         # Process terms in parallel
         async with asyncio.TaskGroup() as tg:
@@ -561,7 +577,7 @@ async def main(
                     if term == "":
                         continue
                     output_path = Path(output_data_dir) / f"{term}.json"
-                    tg.create_task(
+                    task = tg.create_task(
                         get_term_course_data(
                             term,
                             output_path=output_path,
@@ -574,6 +590,14 @@ async def main(
                             timeout=timeout,
                         )
                     )
+                    tasks.append(task)
+
+        # Wait for all tasks to complete
+        for task in tasks:
+            success = task.result()
+            if success:
+                num_terms_processed += 1
+
     except Exception as e:
         logging.error(f"Error in SIS scraper: {e}")
         import traceback
@@ -631,6 +655,7 @@ async def main(
 
     end_time = time.time()
     logging.info("SIS scraper completed")
+    logging.info(f"  Terms processed: {num_terms_processed}")
     logging.info(f"  Time elapsed: {end_time - start_time:.2f} seconds")
 
     return True

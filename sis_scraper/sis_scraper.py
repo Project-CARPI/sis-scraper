@@ -231,7 +231,7 @@ async def get_course_data(
     attribute_code_name_map: dict[str, str] = None,
     semaphore: asyncio.Semaphore = asyncio.Semaphore(1),
     limit_per_host: int = 5,
-    timeout: int = 60,
+    timeout: int = 30,
 ) -> dict[str, dict[str, Any]]:
     """
     Gets all course data for a given term and subject.
@@ -299,7 +299,7 @@ async def get_term_course_data(
     attribute_code_name_map: dict[str, str] = None,
     semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
     limit_per_host: int = 5,
-    timeout: int = 60,
+    timeout: int = 30,
 ) -> None:
     """
     Gets all course data for a given term, which includes all subjects in the term.
@@ -388,7 +388,7 @@ async def main(
     subject_code_name_map_path: Path | str | None = None,
     semaphore_val: int = 10,
     limit_per_host: int = 5,
-    timeout: int = 120,
+    timeout: int = 30,
 ) -> bool:
     """
     Runs the SIS scraper for the specified range of years and seasons. The earliest

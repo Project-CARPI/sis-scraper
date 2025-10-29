@@ -41,6 +41,24 @@ class ClassColumn(str, Enum):
     TERM = "term"
 
 
+def html_unescape(obj: Any) -> Any:
+    """
+    Recursively unescape HTML entities in all string values within a complex
+    structure (dicts, lists, tuples, sets). Dictionary keys are unescaped too.
+    """
+    if isinstance(obj, str):
+        return html.unescape(obj)
+    if isinstance(obj, dict):
+        return {html_unescape(k): html_unescape(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [html_unescape(i) for i in obj]
+    if isinstance(obj, tuple):
+        return tuple(html_unescape(i) for i in obj)
+    if isinstance(obj, set):
+        return {html_unescape(i) for i in obj}
+    return obj
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_random_exponential(multiplier=1.5) + wait_random(min=0, max=2),
@@ -66,24 +84,6 @@ async def retry_get(
         response.raise_for_status()
         raw_data = await response.text()
     return raw_data
-
-
-def html_unescape(obj: Any) -> Any:
-    """
-    Recursively unescape HTML entities in all string values within a complex
-    structure (dicts, lists, tuples, sets). Dictionary keys are unescaped too.
-    """
-    if isinstance(obj, str):
-        return html.unescape(obj)
-    if isinstance(obj, dict):
-        return {html_unescape(k): html_unescape(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [html_unescape(i) for i in obj]
-    if isinstance(obj, tuple):
-        return tuple(html_unescape(i) for i in obj)
-    if isinstance(obj, set):
-        return {html_unescape(i) for i in obj}
-    return obj
 
 
 async def get_term_subjects(

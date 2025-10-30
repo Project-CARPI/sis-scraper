@@ -300,7 +300,8 @@ def main(
             / "generated_instructor_rcsid_name_map.json"
         )
         logging.info(
-            f"Writing {len(generated_instructor_rcsid_name_map)} generated instructor RCSID mappings to {generated_map_path}"
+            f"Writing {len(generated_instructor_rcsid_name_map)} generated "
+            f"instructor RCSID mappings to {generated_map_path}"
         )
         with generated_map_path.open("w", encoding="utf-8") as f:
             json.dump(

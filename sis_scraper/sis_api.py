@@ -18,7 +18,7 @@ from tenacity import (
 
 # Restriction data structure is dynamically generated based on values in this dictionary,
 # except for "Special Approvals", which is handled explicitly as a special case.
-RESTRICTION_TYPE_MAP = {
+_RESTRICTION_TYPE_MAP = {
     "Majors": "major",
     "Fields of Study (Major, Minor or Concentration)": "major",
     "Minors": "minor",
@@ -31,6 +31,8 @@ RESTRICTION_TYPE_MAP = {
     "Colleges": "college",
     "Special Approvals": "special_approval",
 }
+
+_BASE_URL = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/"
 
 
 class ClassColumn(str, Enum):
@@ -105,7 +107,7 @@ async def get_term_subjects(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_subject"
+    url = _BASE_URL + "classSearch/get_subject"
     params = {"term": term, "offset": 1, "max": 2147483647}
     raw_data = raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -131,7 +133,7 @@ async def get_term_instructors(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_instructor"
+    url = _BASE_URL + "classSearch/get_instructor"
     params = {"term": term, "offset": 1, "max": 2147483647}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -160,7 +162,7 @@ async def get_all_attributes(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_attribute"
+    url = _BASE_URL + "classSearch/get_attribute"
     params = {"searchTerm": search_term, "offset": 1, "max": 2147483647}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -186,7 +188,7 @@ async def get_all_colleges(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_college"
+    url = _BASE_URL + "classSearch/get_college"
     params = {"searchTerm": search_term, "offset": 1, "max": 2147483647}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -212,7 +214,7 @@ async def get_all_campuses(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_campus"
+    url = _BASE_URL + "classSearch/get_campus"
     params = {"searchTerm": search_term}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -229,8 +231,8 @@ async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
     from the last subject accessed, or no data if attempting to access data
     from a different term.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/term/search?mode=search"
-    params = {"term": term}
+    url = _BASE_URL + "term/search"
+    params = {"mode": "search", "term": term}
     await retry_get(session, url, params)
 
 
@@ -250,7 +252,7 @@ async def class_search(
 
     Returned data format is very large; see docs for details.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/searchResults"
+    url = _BASE_URL + "searchResults/searchResults"
     params = {
         "pageOffset": 0,
         "txt_subject": subject,
@@ -279,7 +281,7 @@ async def get_class_description(
     additional fields such as "When Offered", "Credit Hours", "Prerequisite",
     etc.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCourseDescription"
+    url = _BASE_URL + "searchResults/getCourseDescription"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -312,7 +314,7 @@ async def get_class_attributes(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getSectionAttributes"
+    url = _BASE_URL + "searchResults/getSectionAttributes"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -341,16 +343,14 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     }
     ```
     """
-    url = (
-        "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getRestrictions"
-    )
+    url = _BASE_URL + "searchResults/getRestrictions"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     # Dynamically build restrictions_data dict structure from RESTRICTION_TYPE_MAP values
     restrictions_data = {}
-    bases = set(RESTRICTION_TYPE_MAP.values())
+    bases = set(_RESTRICTION_TYPE_MAP.values())
     for base in sorted(bases):
         restrictions_data[base] = []
         # There is no "not_" key for "special_approval"
@@ -358,7 +358,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             continue
         restrictions_data[f"not_{base}"] = []
     restrictions_tag = soup.find("section", {"aria-labelledby": "restrictions"})
-    escaped_keys = [re.escape(key) for key in RESTRICTION_TYPE_MAP.keys()]
+    escaped_keys = [re.escape(key) for key in _RESTRICTION_TYPE_MAP.keys()]
     restriction_header_pattern = (
         r"(Must|Cannot) be enrolled in one of the following "
         f"({'|'.join(escaped_keys)}):"
@@ -397,14 +397,14 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             restriction_list = restrictions_data["special_approval"]
         else:
             must_or_cannot, type_plural = header_match.groups()
-            if type_plural not in RESTRICTION_TYPE_MAP:
+            if type_plural not in _RESTRICTION_TYPE_MAP:
                 logging.warning(
                     f"Skipping unknown restriction type '{type_plural}' for CRN {crn} "
                     f"in term {term}"
                 )
                 i += 1
                 continue
-            key_base = RESTRICTION_TYPE_MAP[type_plural]
+            key_base = _RESTRICTION_TYPE_MAP[type_plural]
             key = f"not_{key_base}" if must_or_cannot.lower() == "cannot" else key_base
             restriction_list = restrictions_data[key]
         i += 1
@@ -472,7 +472,7 @@ async def get_class_prerequisites(
     }
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getSectionPrerequisites"
+    url = _BASE_URL + "searchResults/getSectionPrerequisites"
     params = {"term": term, "courseReferenceNumber": crn}
     # async with session.get(url, params=params) as response:
     #     response.raise_for_status()
@@ -530,9 +530,7 @@ async def get_class_corequisites(
     ]
     ```
     """
-    url = (
-        "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCorequisites"
-    )
+    url = _BASE_URL + "searchResults/getCorequisites"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -585,9 +583,7 @@ async def get_class_crosslists(
     ]
     ```
     """
-    url = (
-        "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getXlstSections"
-    )
+    url = _BASE_URL + "searchResults/getXlstSections"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)

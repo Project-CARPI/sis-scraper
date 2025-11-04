@@ -16,9 +16,9 @@ from tenacity import (
     wait_random_exponential,
 )
 
-# from prereq_parser import parse_prereq
-
-RESTRICTION_TYPE_MAP = {
+# Restriction data structure is dynamically generated based on values in this dictionary,
+# except for "Special Approvals", which is handled explicitly as a special case.
+_RESTRICTION_TYPE_MAP = {
     "Majors": "major",
     "Fields of Study (Major, Minor or Concentration)": "major",
     "Minors": "minor",
@@ -29,7 +29,10 @@ RESTRICTION_TYPE_MAP = {
     "Departments": "department",
     "Campuses": "campus",
     "Colleges": "college",
+    "Special Approvals": "special_approval",
 }
+
+_BASE_URL = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/"
 
 
 class ClassColumn(str, Enum):
@@ -90,8 +93,8 @@ async def get_term_subjects(
     session: aiohttp.ClientSession, term: str
 ) -> list[dict[str, str]]:
     """
-    Fetches the list of subjects and codes for a given term from SIS. If the term is
-    invalid or doesn't exist, returns an empty list.
+    Fetches the list of subjects and codes for a given term from SIS. If the
+    term is invalid or doesn't exist, returns an empty list.
 
     Returned data format is as follows:
     ```
@@ -104,7 +107,7 @@ async def get_term_subjects(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_subject"
+    url = _BASE_URL + "classSearch/get_subject"
     params = {"term": term, "offset": 1, "max": 2147483647}
     raw_data = raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -116,8 +119,8 @@ async def get_term_instructors(
     session: aiohttp.ClientSession, term: str
 ) -> list[dict[str, str]]:
     """
-    Fetches the list of instructors for a given term from SIS. If the term is invalid
-    or doesn't exist, returns an empty list.
+    Fetches the list of instructors for a given term from SIS. If the term is
+    invalid or doesn't exist, returns an empty list.
 
     Returned data format is as follows:
     ```
@@ -130,7 +133,7 @@ async def get_term_instructors(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_instructor"
+    url = _BASE_URL + "classSearch/get_instructor"
     params = {"term": term, "offset": 1, "max": 2147483647}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -144,9 +147,9 @@ async def get_all_attributes(
     """
     Fetches the master list of attributes from SIS.
 
-    Note that this is not actually a comprehensive list of all attributes used by
-    courses. For example, "FRSH" and "ONLI" are known attributes that are missing
-    from this list.
+    Note that this is not actually a comprehensive list of all attributes used
+    by courses. For example, "FRSH" and "ONLI" are known attributes that are
+    missing from this list.
 
     Returned data format is as follows:
     ```
@@ -159,7 +162,7 @@ async def get_all_attributes(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_attribute"
+    url = _BASE_URL + "classSearch/get_attribute"
     params = {"searchTerm": search_term, "offset": 1, "max": 2147483647}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -171,8 +174,8 @@ async def get_all_colleges(
     session: aiohttp.ClientSession, search_term: str = ""
 ) -> list[dict[str, str]]:
     """
-    Fetches the master list of colleges (schools) and codes from SIS. Not to be confused
-    with campuses.
+    Fetches the master list of colleges (schools) and codes from SIS. Not to be
+    confused with campuses.
 
     Returned data format is as follows:
     ```
@@ -185,7 +188,7 @@ async def get_all_colleges(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_college"
+    url = _BASE_URL + "classSearch/get_college"
     params = {"searchTerm": search_term, "offset": 1, "max": 2147483647}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -197,8 +200,8 @@ async def get_all_campuses(
     session: aiohttp.ClientSession, search_term: str = ""
 ) -> list[dict[str, str]]:
     """
-    Fetches the master list of campuses and codes from SIS. Not to be confused with
-    colleges (schools).
+    Fetches the master list of campuses and codes from SIS. Not to be confused
+    with colleges (schools).
 
     Returned data format is as follows:
     ```
@@ -211,7 +214,7 @@ async def get_all_campuses(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/classSearch/get_campus"
+    url = _BASE_URL + "classSearch/get_campus"
     params = {"searchTerm": search_term}
     raw_data = await retry_get(session, url, params)
     data = json.loads(raw_data)
@@ -223,12 +226,13 @@ async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
     """
     Resets the term and subject search state on the SIS server.
 
-    Must be called before each attempt to fetch classes from a subject in the given term.
-    Otherwise, the server will continue returning the same results from the last subject
-    accessed, or no data if attempting to access data from a different term.
+    Must be called before each attempt to fetch classes from a subject in the
+    given term. Otherwise, the server will continue returning the same results
+    from the last subject accessed, or no data if attempting to access data
+    from a different term.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/term/search?mode=search"
-    params = {"term": term}
+    url = _BASE_URL + "term/search"
+    params = {"mode": "search", "term": term}
     await retry_get(session, url, params)
 
 
@@ -243,13 +247,14 @@ async def class_search(
     """
     Fetches the list of classes for a given subject and term from SIS.
 
-    The term and subject search state on the SIS server must be reset before each call
-    to this function.
+    The term and subject search state on the SIS server must be reset before
+    each call to this function.
 
     Returned data format is very large; see docs for details.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/searchResults?pageOffset=0"
+    url = _BASE_URL + "searchResults/searchResults"
     params = {
+        "pageOffset": 0,
         "txt_subject": subject,
         "txt_term": term,
         "pageMaxSize": max_size,
@@ -269,12 +274,14 @@ async def get_class_description(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> str:
     """
-    Fetches and parses data from the "Course Description" tab of a class details page.
+    Fetches and parses data from the "Course Description" tab of a class
+    details page.
 
-    Returns a string containing the course description, without any additional fields
-    such as "When Offered", "Credit Hours", "Prerequisite", etc.
+    Returns a string containing the course description, without any
+    additional fields such as "When Offered", "Credit Hours", "Prerequisite",
+    etc.
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCourseDescription"
+    url = _BASE_URL + "searchResults/getCourseDescription"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -307,7 +314,7 @@ async def get_class_attributes(
     ]
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getSectionAttributes"
+    url = _BASE_URL + "searchResults/getSectionAttributes"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -321,7 +328,8 @@ async def get_class_attributes(
 
 async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn: str):
     """
-    Fetches and parses data from the "Restrictions" tab of a class details page.
+    Fetches and parses data from the "Restrictions" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -335,35 +343,26 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     }
     ```
     """
-    url = (
-        "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getRestrictions"
-    )
+    url = _BASE_URL + "searchResults/getRestrictions"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
-    restrictions_data = {
-        "major": [],
-        "not_major": [],
-        "minor": [],
-        "not_minor": [],
-        "level": [],
-        "not_level": [],
-        "classification": [],
-        "not_classification": [],
-        "degree": [],
-        "not_degree": [],
-        "department": [],
-        "not_department": [],
-        "campus": [],
-        "not_campus": [],
-        "college": [],
-        "not_college": [],
-        "special_approval": [],
-    }
+    # Dynamically build restrictions_data dict structure from RESTRICTION_TYPE_MAP values
+    restrictions_data = {}
+    bases = set(_RESTRICTION_TYPE_MAP.values())
+    for base in sorted(bases):
+        restrictions_data[base] = []
+        # There is no "not_" key for "special_approval"
+        if base == "special_approval":
+            continue
+        restrictions_data[f"not_{base}"] = []
     restrictions_tag = soup.find("section", {"aria-labelledby": "restrictions"})
-    escaped_keys = [re.escape(key) for key in RESTRICTION_TYPE_MAP.keys()]
-    restriction_header_pattern = rf"(Must|Cannot) be enrolled in one of the following ({'|'.join(escaped_keys)}):"
+    escaped_keys = [re.escape(key) for key in _RESTRICTION_TYPE_MAP.keys()]
+    restriction_header_pattern = (
+        r"(Must|Cannot) be enrolled in one of the following "
+        f"({'|'.join(escaped_keys)}):"
+    )
     # "Special Approvals:" is the only other known header pattern
     special_approvals_pattern = r"Special Approvals:"
     # All known children of the restrictions section are <div>, <span<>, or <br> tags
@@ -378,7 +377,8 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         content = restrictions_content[i]
         if content.string is None:
             logging.warning(
-                f"Skipping unexpected restriction content with no string for term and CRN: {term} - {crn}"
+                "Skipping unexpected restriction content with no string for "
+                f"CRN {crn} in term {term}"
             )
             i += 1
             continue
@@ -389,12 +389,23 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         if header_match is None:
             i += 1
             continue
+        # Special case for "Special Approvals:"
         if len(header_match.groups()) == 0:
+            if "special_approval" not in restrictions_data:
+                i += 1
+                continue
             restriction_list = restrictions_data["special_approval"]
         else:
             must_or_cannot, type_plural = header_match.groups()
-            key_base = RESTRICTION_TYPE_MAP[type_plural]
-            key = f"not_{key_base}" if must_or_cannot == "Cannot" else key_base
+            if type_plural not in _RESTRICTION_TYPE_MAP:
+                logging.warning(
+                    f"Skipping unknown restriction type '{type_plural}' for CRN {crn} "
+                    f"in term {term}"
+                )
+                i += 1
+                continue
+            key_base = _RESTRICTION_TYPE_MAP[type_plural]
+            key = f"not_{key_base}" if must_or_cannot.lower() == "cannot" else key_base
             restriction_list = restrictions_data[key]
         i += 1
         next_content_string = ""
@@ -402,7 +413,8 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             next_content = restrictions_content[i]
             if next_content.string is None:
                 logging.warning(
-                    f"Skipping unexpected restriction content with no string for term and CRN: {term} - {crn}"
+                    f"Skipping unexpected restriction content with no string for "
+                    f"CRN {crn} in term {term}"
                 )
                 i += 1
                 continue
@@ -415,7 +427,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
             # <span>Communication</span>
             # <span>Media</span>
             # <span> & Design (COMD)</span>
-            if next_content_string == "":
+            if len(next_content_string) == 0:
                 next_content_string = next_content.string.lstrip()
             else:
                 next_content_string += f",{next_content.string}"
@@ -424,7 +436,9 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
                 special_approvals_pattern, next_content_string
             ):
                 break
-            if re.match(r".*\(.*\)", next_content_string):
+            if restriction_list is restrictions_data["special_approval"] or re.match(
+                r".*\(.*\)", next_content_string
+            ):
                 restriction_list.append(next_content_string.strip())
                 next_content_string = ""
             i += 1
@@ -435,7 +449,8 @@ async def get_class_prerequisites(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> dict[str, Any]:
     """
-    Fetches and parses data from the "Prerequisites" tab of a class details page.
+    Fetches and parses data from the "Prerequisites" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -457,7 +472,7 @@ async def get_class_prerequisites(
     }
     ```
     """
-    url = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getSectionPrerequisites"
+    url = _BASE_URL + "searchResults/getSectionPrerequisites"
     params = {"term": term, "courseReferenceNumber": crn}
     # async with session.get(url, params=params) as response:
     #     response.raise_for_status()
@@ -488,7 +503,8 @@ async def get_class_prerequisites(
     #         return parse_prereq(term, crn, data)
     #     except Exception as e:
     #         logging.error(
-    #             f"Error parsing prerequisites for CRN {crn} in term {term} with data: {data}\n{e}"
+    #             f"Error parsing prerequisites for CRN {crn} in term {term} "
+    #             f"with data: {data}\n{e}"
     #         )
     #         import traceback
 
@@ -502,7 +518,8 @@ async def get_class_corequisites(
     crn: str,
 ):
     """
-    Fetches and parses data from the "Corequisites" tab of a class details page.
+    Fetches and parses data from the "Corequisites" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -513,9 +530,7 @@ async def get_class_corequisites(
     ]
     ```
     """
-    url = (
-        "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getCorequisites"
-    )
+    url = _BASE_URL + "searchResults/getCorequisites"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -532,7 +547,7 @@ async def get_class_corequisites(
     # Known corequisite columns are Subject, Course, and Title
     if len(thead_cols) != 3:
         logging.warning(
-            f"Unexpected number of corequisite columns for term and CRN: {term} - {crn}"
+            f"Unexpected number of corequisite columns for CRN {crn} in term {term}"
         )
         return []
     coreqs = []
@@ -540,7 +555,8 @@ async def get_class_corequisites(
         cols = [td.text.strip() for td in tr.find_all("td")]
         if len(cols) != len(thead_cols):
             logging.warning(
-                f"Skipping unexpected corequisite row with mismatched columns for term and CRN: {term} - {crn}"
+                f"Skipping unexpected corequisite row with mismatched columns for "
+                f"CRN {crn} in term {term}"
             )
             continue
         subject = cols[0]
@@ -555,7 +571,8 @@ async def get_class_crosslists(
     crn: str,
 ):
     """
-    Fetches and parses data from the "Cross Listed" tab of a class details page.
+    Fetches and parses data from the "Cross Listed" tab of a class details
+    page.
 
     Returned data format is as follows:
     ```
@@ -566,9 +583,7 @@ async def get_class_crosslists(
     ]
     ```
     """
-    url = (
-        "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/searchResults/getXlstSections"
-    )
+    url = _BASE_URL + "searchResults/getXlstSections"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
@@ -593,7 +608,8 @@ async def get_class_crosslists(
         cols = [td.text.strip() for td in tr.find_all("td")]
         if len(cols) != len(thead_cols):
             logging.warning(
-                f"Skipping unexpected crosslist row with mismatched columns for term and CRN: {term} - {crn}"
+                f"Skipping unexpected crosslist row with mismatched columns for "
+                f"CRN {crn} in term {term}"
             )
             continue
         subject = cols[1]

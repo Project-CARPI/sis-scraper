@@ -3,7 +3,7 @@ aiohttp==3.13.0
 aiosignal==1.4.0
 attrs==25.4.0
 beautifulsoup4==4.14.2
-carpi-data-model @ git+https://github.com/Project-CARPI/database-schema.git@020b3483245df43e0a487d5d9f8f0b17114105d6
+carpi-data-model @ git+https://github.com/Project-CARPI/database-schema.git
 frozenlist==1.8.0
 html5lib==1.1
 idna==3.11

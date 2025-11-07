@@ -9,6 +9,20 @@ _engine: Engine = None
 _session_factory: sessionmaker = None
 
 
+class SemesterAgnosticData:
+    def __init__(self):
+        self.course = {}
+        self.course_attribute = {}
+        self.course_relationship = {}
+        self.course_restriction = {}
+
+
+class SemesterSpecificData:
+    def __init__(self):
+        self.course_offering = []
+        self.course_faculty = []
+
+
 def init_db_connection(
     db_dialect: str,
     db_api: str,
@@ -35,34 +49,68 @@ def generate_schema(engine: Engine) -> None:
 
 
 def drop_all_tables(engine: Engine) -> None:
-    models.Base.metadata.drop_all(engine)
+    with engine.connect() as conn:
+        trans = conn.begin()
+        for table in reversed(models.Base.metadata.sorted_tables):
+            conn.execute(table.delete())
+        trans.commit()
 
 
-def insert_models_from_json(session: Session, json_path: Path) -> None:
+def extract_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
+    stem = json_path.stem
+    year = int(stem[:4])
+    semester_code = stem[4:]
+    match semester_code:
+        case "01":
+            semester = "SPRING"
+        case "05":
+            semester = "SUMMER"
+        case "09":
+            semester = "FALL"
+    return year, semester
+
+
+def compile_course_objects_from_json(
+    course_objects: dict, sem_specific_data: SemesterSpecificData, json_path: Path
+) -> None:
     with open(json_path, "r") as f:
         term_course_data = json.load(f)
-    for subject_code, subject_data in term_course_data.items():
-        # Insert Subject
-        subject_name = subject_data["subject_name"]
-        subject_model = models.Subject(subj_code=subject_code, title=subject_name)
-        session.merge(subject_model)
-        subject_courses = subject_data["courses"]
-        for course_code, course_data in subject_courses.items():
-            course_num = course_code.split(" ")[1]
+    for _, subject_data in term_course_data.items():
+        for course_code, course_data in subject_data["courses"].items():
             course_details = course_data["course_detail"]
-            course_credits = course_details["credits"]
-            if course_data["course_name"] == "GRAD ARCH DESIGN 4":
-                print(subject_code, course_num)
-            # Insert Course
-            course_model = models.Course(
-                subj_code=subject_code,
-                code_num=course_num,
-                title=course_data["course_name"],
-                desc_text=course_details["description"],
-                credit_min=course_credits["min"],
-                credit_max=course_credits["max"],
+            # Add entire course object
+            if course_data not in course_objects:
+                if course_code not in course_objects:
+                    course_objects[course_code] = course_data
+            # Extract semester-specific data
+            year, semester = extract_semester_info_from_filename(json_path)
+            subj_code = course_code.split(" ")[0]
+            code_num = course_code.split(" ")[1]
+            seats_total = 0
+            seats_filled = 0
+            for section in course_details["sections"]:
+                seats_total += section["seats_total"]
+                seats_filled += section["seats_filled"]
+                for faculty_rcsid in section["instructor"]:
+                    sem_specific_data.course_faculty.append(
+                        models.Course_Faculty(
+                            sem_year=year,
+                            semester=semester,
+                            subj_code=subj_code,
+                            code_num=code_num,
+                            rcsid=faculty_rcsid,
+                        )
+                    )
+            sem_specific_data.course_offering.append(
+                models.Course_Offering(
+                    sem_year=year,
+                    semester=semester,
+                    subj_code=subj_code,
+                    code_num=code_num,
+                    seats_filled=seats_filled,
+                    seats_total=seats_total,
+                )
             )
-            session.merge(course_model)
 
 
 def main(
@@ -74,21 +122,40 @@ def main(
     db_password: str,
     db_schema: str,
 ) -> None:
+    """
+    PSEUDOCODE (temporary)
+    initialize big data structure with lists for all models
+    for each json file (IN REVERSE CHRONOLOGICAL ORDER): DONE
+        for each department:
+            for each course:
+                add the entire course json object to the "big data structure"
+                    on duplicate ignore
+                extract semester-specific data and add that separately to the "big data structure"
+    after all json files processed:
+        for each model list in the "big data structure":
+            bulk insert into database
+            commit
+    have a nice day
+    """
+
     if isinstance(processed_data_dir, str):
         processed_data_dir = Path(processed_data_dir)
 
     engine, session_factory = init_db_connection(
-        db_dialect, db_api, db_hostname, db_username, db_password, db_schema, echo=False
+        db_dialect, db_api, db_hostname, db_username, db_password, db_schema, echo=True
     )
-    drop_all_tables(engine)
+    # drop_all_tables(engine)
     generate_schema(engine)
 
-    for json_path in ["processed_data/202509.json"]:
-        print(f"Processing {json_path}...")
-        with session_factory() as session:
-            insert_models_from_json(session, json_path)
-            session.commit()
+    # TODO: insert subjects, attributes, restrictions, and faculty from their separate
+    # JSON files first
 
+    sem_specific_data = SemesterSpecificData()
+    course_objects = {}
+    for json_path in sorted(processed_data_dir.glob("*.json"), reverse=True):
+        compile_course_objects_from_json(course_objects, sem_specific_data, json_path)
+
+    # sem_agnostic_data = SemesterAgnosticData()
     engine.dispose()
 
 

@@ -70,6 +70,59 @@ def extract_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
     return year, semester
 
 
+def get_subjects_from_json(json_path: Path) -> list[models.Attribute]:
+    with open(json_path, "r") as f:
+        subject_data = json.load(f)
+    return [
+        models.Subject(
+            subj_code=code,
+            title=description,
+        )
+        for code, description in subject_data.items()
+    ]
+
+
+def get_attributes_from_json(json_path: Path) -> list[models.Attribute]:
+    with open(json_path, "r") as f:
+        attribute_data = json.load(f)
+    return [
+        models.Attribute(
+            attr_code=code,
+            title=description,
+        )
+        for code, description in attribute_data.items()
+    ]
+
+
+def get_restrictions_from_json(json_path: Path) -> list[models.Restriction]:
+    with open(json_path, "r") as f:
+        restriction_data = json.load(f)
+    restriction_models = []
+    for restriction_category, restriction_list in restriction_data.items():
+        for restriction_code, description in restriction_list.items():
+            restriction_models.append(
+                models.Restriction(
+                    category=restriction_category.upper(),
+                    restr_code=restriction_code,
+                    title=description,
+                )
+            )
+    return restriction_models
+
+
+def get_faculty_from_json(json_path: Path) -> list[models.Faculty]:
+    with open(json_path, "r") as f:
+        faculty_data = json.load(f)
+    return [
+        models.Faculty(
+            rcsid=rcsid,
+            first_name=name.split(",")[1].strip(),
+            last_name=name.split(",")[0].strip(),
+        )
+        for rcsid, name in faculty_data.items()
+    ]
+
+
 def compile_course_objects_from_json(
     course_objects: dict, sem_specific_data: SemesterSpecificData, json_path: Path
 ) -> None:
@@ -217,8 +270,26 @@ def main(
     # drop_all_tables(engine)
     generate_schema(engine)
 
-    # TODO: insert subjects, attributes, restrictions, and faculty from their separate
-    # JSON files first
+    # Load and insert code mappings since other tables depend on them
+    code_mapping_dir = os.getenv("SCRAPER_CODE_MAPS_DIR")
+    subject_models = get_subjects_from_json(
+        Path(code_mapping_dir) / os.getenv("SUBJECT_CODE_NAME_MAP_FILENAME")
+    )
+    attribute_models = get_attributes_from_json(
+        Path(code_mapping_dir) / os.getenv("ATTRIBUTE_CODE_NAME_MAP_FILENAME")
+    )
+    restriction_models = get_restrictions_from_json(
+        Path(code_mapping_dir) / os.getenv("RESTRICTION_CODE_NAME_MAP_FILENAME")
+    )
+    faculty_models = get_faculty_from_json(
+        Path(code_mapping_dir) / os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
+    )
+    with Session(engine) as session:
+        session.bulk_save_objects(restriction_models)
+        session.bulk_save_objects(attribute_models)
+        session.bulk_save_objects(subject_models)
+        session.bulk_save_objects(faculty_models)
+        session.commit()
 
     sem_specific_data = SemesterSpecificData()
     course_objects = {}

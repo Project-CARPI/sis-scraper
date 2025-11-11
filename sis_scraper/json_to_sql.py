@@ -141,8 +141,8 @@ def compile_course_objects_from_json(
             seats_total = 0
             seats_filled = 0
             for section in course_details["sections"]:
-                seats_total += section["seats_total"]
-                seats_filled += section["seats_filled"]
+                seats_total += section["capacity"]
+                seats_filled += section["registered"]
                 for faculty_rcsid in section["instructor"]:
                     sem_specific_data.course_faculty.append(
                         models.Course_Faculty(
@@ -176,7 +176,7 @@ def compile_semester_agnostic_data_from_course_objects(
             models.Course(
                 subj_code=subj_code,
                 code_num=code_num,
-                title=course_details["title"],
+                title=course_data["course_name"],
                 desc_text=course_details["description"],
                 credit_min=course_details["credits"]["min"],
                 credit_max=course_details["credits"]["max"],
@@ -187,7 +187,7 @@ def compile_semester_agnostic_data_from_course_objects(
                 models.Course_Attribute(
                     subj_code=subj_code,
                     code_num=code_num,
-                    attribute_code=attribute_code,
+                    attr_code=attribute_code,
                 )
                 for attribute_code in course_details["attributes"]
             ]
@@ -199,7 +199,7 @@ def compile_semester_agnostic_data_from_course_objects(
                     code_num=code_num,
                     relationship="COREQ",
                     rel_subj=coreq.split(" ")[0],
-                    rel_code=coreq.split(" ")[1],
+                    rel_code_num=coreq.split(" ")[1],
                 )
                 for coreq in course_details["corequisite"]
             ]
@@ -211,7 +211,7 @@ def compile_semester_agnostic_data_from_course_objects(
                     code_num=code_num,
                     relationship="CROSS",
                     rel_subj=cross.split(" ")[0],
-                    rel_code=cross.split(" ")[1],
+                    rel_code_num=cross.split(" ")[1],
                 )
                 for cross in course_details["crosslist"]
             ]

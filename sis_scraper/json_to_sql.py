@@ -295,6 +295,18 @@ def main(
     course_objects = {}
     for json_path in sorted(processed_data_dir.glob("*.json"), reverse=True):
         compile_course_objects_from_json(course_objects, sem_specific_data, json_path)
+    sem_agnostic_data = compile_semester_agnostic_data_from_course_objects(
+        course_objects
+    )
+    with Session(engine) as session:
+        session.bulk_save_objects(sem_agnostic_data.course)
+        session.commit()
+        session.bulk_save_objects(sem_agnostic_data.course_attribute)
+        session.bulk_save_objects(sem_agnostic_data.course_relationship)
+        session.bulk_save_objects(sem_agnostic_data.course_restriction)
+        session.bulk_save_objects(sem_specific_data.course_offering)
+        session.bulk_save_objects(sem_specific_data.course_faculty)
+        session.commit()
 
     # sem_agnostic_data = SemesterAgnosticData()
     engine.dispose()

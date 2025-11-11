@@ -78,10 +78,9 @@ def compile_course_objects_from_json(
     for _, subject_data in term_course_data.items():
         for course_code, course_data in subject_data["courses"].items():
             course_details = course_data["course_detail"]
-            # Add entire course object
-            if course_data not in course_objects:
-                if course_code not in course_objects:
-                    course_objects[course_code] = course_data
+            # Add entire course object:
+            if course_code not in course_objects:
+                course_objects[course_code] = course_data
             # Extract semester-specific data
             year, semester = extract_semester_info_from_filename(json_path)
             subj_code = course_code.split(" ")[0]

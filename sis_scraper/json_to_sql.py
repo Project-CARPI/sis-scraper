@@ -11,10 +11,10 @@ _session_factory: sessionmaker = None
 
 class SemesterAgnosticData:
     def __init__(self):
-        self.course = {}
-        self.course_attribute = {}
-        self.course_relationship = {}
-        self.course_restriction = {}
+        self.course = []
+        self.course_attribute = []
+        self.course_relationship = []
+        self.course_restriction = []
 
 
 class SemesterSpecificData:
@@ -110,6 +110,77 @@ def compile_course_objects_from_json(
                     seats_total=seats_total,
                 )
             )
+
+
+def compile_semester_agnostic_data_from_course_objects(
+    course_objects: dict,
+) -> SemesterAgnosticData:
+    semester_agnostic_data = SemesterAgnosticData()
+    for course_code, course_data in course_objects.items():
+        course_details = course_data["course_detail"]
+        subj_code, code_num = course_code.split(" ")
+        semester_agnostic_data.course.append(
+            models.Course(
+                subj_code=subj_code,
+                code_num=code_num,
+                title=course_details["title"],
+                desc_text=course_details["description"],
+                credit_min=course_details["credits"]["min"],
+                credit_max=course_details["credits"]["max"],
+            )
+        )
+        semester_agnostic_data.course_attribute.extend(
+            [
+                models.Course_Attribute(
+                    subj_code=subj_code,
+                    code_num=code_num,
+                    attribute_code=attribute_code,
+                )
+                for attribute_code in course_details["attributes"]
+            ]
+        )
+        semester_agnostic_data.course_relationship.extend(
+            [
+                models.Course_Relationship(
+                    subj_code=subj_code,
+                    code_num=code_num,
+                    relationship="COREQ",
+                    rel_subj=coreq.split(" ")[0],
+                    rel_code=coreq.split(" ")[1],
+                )
+                for coreq in course_details["corequisite"]
+            ]
+        )
+        semester_agnostic_data.course_relationship.extend(
+            [
+                models.Course_Relationship(
+                    subj_code=subj_code,
+                    code_num=code_num,
+                    relationship="CROSS",
+                    rel_subj=cross.split(" ")[0],
+                    rel_code=cross.split(" ")[1],
+                )
+                for cross in course_details["crosslist"]
+            ]
+        )
+        for restriction_type, restriction_values in course_details[
+            "restrictions"
+        ].items():
+            must_be = not restriction_type.startswith("not_")
+            type_key = restriction_type.removeprefix("not_").upper()
+            semester_agnostic_data.course_restriction.extend(
+                [
+                    models.Course_Restriction(
+                        subj_code=subj_code,
+                        code_num=code_num,
+                        restr_rule="MUST_BE" if must_be else "CANNOT_BE",
+                        category=type_key,
+                        restr_code=restr_code,
+                    )
+                    for restr_code in restriction_values
+                ]
+            )
+    return semester_agnostic_data
 
 
 def main(

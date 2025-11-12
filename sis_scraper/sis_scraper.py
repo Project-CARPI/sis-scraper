@@ -120,6 +120,7 @@ async def process_class_details(
         attributes_data = attributes_task.result()
         restrictions_data = restrictions_task.result()
         prerequisites_data = prerequisites_task.result()
+        # TODO: Filter out self-references from prerequisites
         corequisites_data = corequisites_task.result()
         corequisites_data = list(
             filter(

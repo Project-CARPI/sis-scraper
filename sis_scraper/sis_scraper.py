@@ -121,7 +121,21 @@ async def process_class_details(
         restrictions_data = restrictions_task.result()
         prerequisites_data = prerequisites_task.result()
         corequisites_data = corequisites_task.result()
+        corequisites_data = list(
+            filter(
+                lambda data: data.split()[-1] != class_entry["courseNumber"]
+                or " ".join(data.split()[:-1]) != class_entry["subjectDescription"],
+                corequisites_data,
+            )
+        )
         crosslists_data = crosslists_task.result()
+        crosslists_data = list(
+            filter(
+                lambda data: data.split()[-1] != class_entry["courseNumber"]
+                or " ".join(data.split()[:-1]) != class_entry["subjectDescription"],
+                crosslists_data,
+            )
+        )
 
         # Build attribute code to name map
         # Attributes are known to be in the format "Attribute Name  CODE"

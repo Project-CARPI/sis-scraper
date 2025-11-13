@@ -289,10 +289,10 @@ def main(
         Path(code_mapping_dir) / os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
     )
     with Session(engine) as session:
-        session.bulk_save_objects(restriction_models)
-        session.bulk_save_objects(attribute_models)
-        session.bulk_save_objects(subject_models)
-        session.bulk_save_objects(faculty_models)
+        session.add_all(restriction_models)
+        session.add_all(attribute_models)
+        session.add_all(subject_models)
+        session.add_all(faculty_models)
         session.commit()
 
     sem_specific_data = SemesterSpecificData()
@@ -303,13 +303,14 @@ def main(
         course_objects
     )
     with Session(engine) as session:
-        session.bulk_save_objects(sem_agnostic_data.course)
+        session.add_all(sem_agnostic_data.course)
         session.commit()
-        session.bulk_save_objects(sem_agnostic_data.course_attribute)
-        session.bulk_save_objects(sem_agnostic_data.course_relationship)
-        session.bulk_save_objects(sem_agnostic_data.course_restriction)
-        session.bulk_save_objects(sem_specific_data.course_offering)
-        session.bulk_save_objects(sem_specific_data.course_faculty)
+        session.add_all(sem_agnostic_data.course_attribute)
+        session.add_all(sem_agnostic_data.course_relationship)
+        session.add_all(sem_agnostic_data.course_restriction)
+        session.add_all(sem_specific_data.course_offering)
+        session.commit()
+        session.add_all(sem_specific_data.course_faculty)
         session.commit()
 
     # sem_agnostic_data = SemesterAgnosticData()

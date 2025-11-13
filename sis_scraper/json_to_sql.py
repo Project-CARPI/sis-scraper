@@ -197,7 +197,7 @@ def compile_semester_agnostic_data_from_course_objects(
                 models.Course_Relationship(
                     subj_code=subj_code,
                     code_num=code_num,
-                    relationship="COREQ",
+                    relationship=models.RelationshipTypeEnum.COREQUISITE,
                     rel_subj=coreq.split(" ")[0],
                     rel_code_num=coreq.split(" ")[1],
                 )
@@ -209,7 +209,7 @@ def compile_semester_agnostic_data_from_course_objects(
                 models.Course_Relationship(
                     subj_code=subj_code,
                     code_num=code_num,
-                    relationship="CROSS",
+                    relationship=models.RelationshipTypeEnum.CROSSLIST,
                     rel_subj=cross.split(" ")[0],
                     rel_code_num=cross.split(" ")[1],
                 )
@@ -226,7 +226,11 @@ def compile_semester_agnostic_data_from_course_objects(
                     models.Course_Restriction(
                         subj_code=subj_code,
                         code_num=code_num,
-                        restr_rule="MUST_BE" if must_be else "CANNOT_BE",
+                        restr_rule=(
+                            models.RestrictionRuleEnum.MUST_BE
+                            if must_be
+                            else models.RestrictionRuleEnum.CANNOT_BE
+                        ),
                         category=type_key,
                         restr_code=restr_code,
                     )

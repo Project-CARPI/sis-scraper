@@ -67,7 +67,7 @@ def extract_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
 
 
 def get_subjects_from_json(json_path: Path) -> list[models.Attribute]:
-    with open(json_path, "r") as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         subject_data = json.load(f)
     return [
         models.Subject(
@@ -79,7 +79,7 @@ def get_subjects_from_json(json_path: Path) -> list[models.Attribute]:
 
 
 def get_attributes_from_json(json_path: Path) -> list[models.Attribute]:
-    with open(json_path, "r") as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         attribute_data = json.load(f)
     return [
         models.Attribute(
@@ -91,7 +91,7 @@ def get_attributes_from_json(json_path: Path) -> list[models.Attribute]:
 
 
 def get_restrictions_from_json(json_path: Path) -> list[models.Restriction]:
-    with open(json_path, "r") as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         restriction_data = json.load(f)
     restriction_models = []
     for restriction_category, restriction_list in restriction_data.items():
@@ -107,7 +107,7 @@ def get_restrictions_from_json(json_path: Path) -> list[models.Restriction]:
 
 
 def get_faculty_from_json(json_path: Path) -> list[models.Faculty]:
-    with open(json_path, "r") as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         faculty_data = json.load(f)
     return [
         models.Faculty(
@@ -122,7 +122,7 @@ def get_faculty_from_json(json_path: Path) -> list[models.Faculty]:
 def compile_course_objects_from_json(
     course_objects: dict, sem_specific_data: SemesterSpecificData, json_path: Path
 ) -> None:
-    with open(json_path, "r") as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         term_course_data = json.load(f)
     for _, subject_data in term_course_data.items():
         for course_code, course_data in subject_data["courses"].items():

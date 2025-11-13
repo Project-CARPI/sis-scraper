@@ -198,7 +198,9 @@ async def process_class_details(
         course_credits["min"], class_entry["creditHourLow"] or 0
     )
     course_credits["max"] = max(
-        course_credits["max"], class_entry["creditHourHigh"] or 0
+        course_credits["max"],
+        class_entry["creditHourLow"] or 0,
+        class_entry["creditHourHigh"] or 0,
     )
 
     course_sections = course_details["sections"]

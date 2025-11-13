@@ -49,11 +49,7 @@ def generate_schema(engine: Engine) -> None:
 
 
 def drop_all_tables(engine: Engine) -> None:
-    with engine.connect() as conn:
-        trans = conn.begin()
-        for table in reversed(models.Base.metadata.sorted_tables):
-            conn.execute(table.delete())
-        trans.commit()
+    models.Base.metadata.drop_all(engine)
 
 
 def extract_semester_info_from_filename(json_path: Path) -> tuple[int, str]:

@@ -248,9 +248,26 @@ def main(
     db_username: str,
     db_password: str,
     db_schema: str,
+    attribute_code_name_map_path: Path | str,
+    instructor_rcsid_name_map_path: Path | str,
+    generated_instructor_rcsid_name_map_path: Path | str,
+    restriction_code_name_map_path: Path | str,
+    subject_code_name_map_path: Path | str,
 ) -> None:
     if isinstance(processed_data_dir, str):
         processed_data_dir = Path(processed_data_dir)
+    if isinstance(attribute_code_name_map_path, str):
+        attribute_code_name_map_path = Path(attribute_code_name_map_path)
+    if isinstance(instructor_rcsid_name_map_path, str):
+        instructor_rcsid_name_map_path = Path(instructor_rcsid_name_map_path)
+    if isinstance(generated_instructor_rcsid_name_map_path, str):
+        generated_instructor_rcsid_name_map_path = Path(
+            generated_instructor_rcsid_name_map_path
+        )
+    if isinstance(restriction_code_name_map_path, str):
+        restriction_code_name_map_path = Path(restriction_code_name_map_path)
+    if isinstance(subject_code_name_map_path, str):
+        subject_code_name_map_path = Path(subject_code_name_map_path)
 
     engine, session_factory = init_db_connection(
         db_dialect, db_api, db_hostname, db_username, db_password, db_schema, echo=True
@@ -258,23 +275,17 @@ def main(
     # drop_all_tables(engine)
     generate_schema(engine)
 
-    # Load and insert code mappings since other tables depend on them
-    code_mapping_dir = os.getenv("SCRAPER_CODE_MAPS_DIR")
-    subject_models = get_subjects_from_json(
-        Path(code_mapping_dir) / os.getenv("SUBJECT_CODE_NAME_MAP_FILENAME")
-    )
-    attribute_models = get_attributes_from_json(
-        Path(code_mapping_dir) / os.getenv("ATTRIBUTE_CODE_NAME_MAP_FILENAME")
+    # Load and insert code mappings first since other tables depend on them
+    attribute_models = get_attributes_from_json(Path(attribute_code_name_map_path))
+    faculty_models = get_faculty_from_json(Path(instructor_rcsid_name_map_path))
+    generated_faculty_models = get_faculty_from_json(
+        Path(generated_instructor_rcsid_name_map_path)
     )
     restriction_models = get_restrictions_from_json(
-        Path(code_mapping_dir) / os.getenv("RESTRICTION_CODE_NAME_MAP_FILENAME")
+        Path(restriction_code_name_map_path)
     )
-    faculty_models = get_faculty_from_json(
-        Path(code_mapping_dir) / os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
-    )
-    generated_faculty_models = get_faculty_from_json(
-        Path(code_mapping_dir) / "generated_instructor_rcsid_name_map.json"
-    )
+    subject_models = get_subjects_from_json(Path(subject_code_name_map_path))
+
     with session_factory() as session:
         session.add_all(restriction_models)
         session.add_all(attribute_models)
@@ -324,12 +335,45 @@ if __name__ == "__main__":
     processed_data_dir = Path(__file__).parent / os.getenv(
         "SCRAPER_PROCESSED_OUTPUT_DATA_DIR"
     )
+    output_data_dir = Path(__file__).parent / os.getenv("SCRAPER_RAW_OUTPUT_DATA_DIR")
+    processed_data_dir = Path(__file__).parent / os.getenv(
+        "SCRAPER_PROCESSED_OUTPUT_DATA_DIR"
+    )
+    code_maps_dir = Path(__file__).parent / os.getenv("SCRAPER_CODE_MAPS_DIR")
+    attribute_code_name_map_path = code_maps_dir / os.getenv(
+        "ATTRIBUTE_CODE_NAME_MAP_FILENAME"
+    )
+    instructor_rcsid_name_map_path = code_maps_dir / os.getenv(
+        "INSTRUCTOR_RCSID_NAME_MAP_FILENAME"
+    )
+    generated_instructor_rcsid_name_map_path = (
+        code_maps_dir / "generated_instructor_rcsid_name_map.json"
+    )
+    restriction_code_name_map_path = code_maps_dir / os.getenv(
+        "RESTRICTION_CODE_NAME_MAP_FILENAME"
+    )
+    subject_code_name_map_path = code_maps_dir / os.getenv(
+        "SUBJECT_CODE_NAME_MAP_FILENAME"
+    )
+
+    db_dialect = os.getenv("DB_DIALECT")
+    db_api = os.getenv("DB_API")
+    db_hostname = os.getenv("DB_HOSTNAME")
+    db_username = os.getenv("DB_USERNAME")
+    db_password = os.getenv("DB_PASSWORD")
+    db_schema = os.getenv("DB_SCHEMA")
+
     main(
         processed_data_dir=processed_data_dir,
-        db_dialect=os.getenv("DB_DIALECT"),
-        db_api=os.getenv("DB_API"),
-        db_hostname=os.getenv("DB_HOSTNAME"),
-        db_username=os.getenv("DB_USERNAME"),
-        db_password=os.getenv("DB_PASSWORD"),
-        db_schema=os.getenv("DB_SCHEMA"),
+        db_dialect=db_dialect,
+        db_api=db_api,
+        db_hostname=db_hostname,
+        db_username=db_username,
+        db_password=db_password,
+        db_schema=db_schema,
+        attribute_code_name_map_path=attribute_code_name_map_path,
+        instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
+        generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
+        restriction_code_name_map_path=restriction_code_name_map_path,
+        subject_code_name_map_path=subject_code_name_map_path,
     )

@@ -329,7 +329,18 @@ def main(
         session.add_all(sem_agnostic_data.course_restriction)
         session.add_all(sem_specific_data.course_offering)
         session.commit()
-        session.add_all(sem_specific_data.course_faculty)
+        # Remove duplicate course faculty models
+        unique_course_faculty = {
+            (
+                course_faculty.sem_year,
+                course_faculty.semester,
+                course_faculty.subj_code,
+                course_faculty.code_num,
+                course_faculty.rcsid,
+            ): course_faculty
+            for course_faculty in sem_specific_data.course_faculty
+        }
+        session.add_all(unique_course_faculty.values())
         session.commit()
 
     # sem_agnostic_data = SemesterAgnosticData()

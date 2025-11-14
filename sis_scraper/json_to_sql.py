@@ -293,22 +293,6 @@ def main(
         session.add_all(sem_agnostic_data.course)
         session.commit()
         session.add_all(sem_agnostic_data.course_attribute)
-        for course_relationship in sem_agnostic_data.course_relationship:
-            # check if rel_subj and rel_code_num exist in Course table
-            rel_course = (
-                session.query(models.Course)
-                .filter_by(
-                    subj_code=course_relationship.rel_subj,
-                    code_num=course_relationship.rel_code_num,
-                )
-                .first()
-            )
-            if rel_course is None:
-                print(
-                    f"Warning: Related course {course_relationship.rel_subj} "
-                    f"{course_relationship.rel_code_num} not found for "
-                    f"{course_relationship.subj_code} {course_relationship.code_num}"
-                )
         session.add_all(sem_agnostic_data.course_relationship)
         session.add_all(sem_agnostic_data.course_restriction)
         session.add_all(sem_specific_data.course_offering)

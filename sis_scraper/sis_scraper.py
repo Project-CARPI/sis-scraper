@@ -203,8 +203,8 @@ async def process_class_details(
         course_details["attributes"] = attributes_data
         course_details["restrictions"] = restrictions_data
         course_details["prerequisite"] = prerequisites_data
-        course_details["corequisite"] = corequisites_data
-        course_details["crosslist"] = crosslists_data
+        course_details["corequisite"] = list(set(corequisites_data))
+        course_details["crosslist"] = list(set(crosslists_data))
 
     course_details = course_data[course_code]["course_detail"]
 

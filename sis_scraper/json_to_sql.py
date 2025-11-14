@@ -119,21 +119,22 @@ def get_faculty_from_json(json_path: Path) -> list[models.Faculty]:
     ]
 
 
-def compile_course_objects_from_json(
-    course_objects: dict, sem_specific_data: SemesterSpecificData, json_path: Path
+def get_raw_course_data(
+    json_path: Path,
+    all_course_data: dict[str, dict],
+    sem_specific_data: SemesterSpecificData,
 ) -> None:
     with open(json_path, "r", encoding="utf-8") as f:
         term_course_data = json.load(f)
     for _, subject_data in term_course_data.items():
         for course_code, course_data in subject_data["courses"].items():
             course_details = course_data["course_detail"]
-            # Add entire course object:
-            if course_code not in course_objects:
-                course_objects[course_code] = course_data
+            # Add entire course object
+            if course_code not in all_course_data:
+                all_course_data[course_code] = course_data
             # Extract semester-specific data
             year, semester = extract_semester_info_from_filename(json_path)
-            subj_code = course_code.split(" ")[0]
-            code_num = course_code.split(" ")[1]
+            subj_code, code_num = course_code.split(" ")
             seats_total = 0
             seats_filled = 0
             for section in course_details["sections"]:
@@ -161,11 +162,11 @@ def compile_course_objects_from_json(
             )
 
 
-def compile_semester_agnostic_data_from_course_objects(
-    course_objects: dict,
+def create_semester_agnostic_models(
+    all_course_data: dict[str, dict],
 ) -> SemesterAgnosticData:
     semester_agnostic_data = SemesterAgnosticData()
-    for course_code, course_data in course_objects.items():
+    for course_code, course_data in all_course_data.items():
         course_details = course_data["course_detail"]
         subj_code, code_num = course_code.split(" ")
         semester_agnostic_data.course.append(
@@ -283,12 +284,12 @@ def main(
         session.commit()
 
     sem_specific_data = SemesterSpecificData()
-    course_objects = {}
+    all_course_data = {}
+    # Process JSON files in reverse chronological order to prioritize latest data
     for json_path in sorted(processed_data_dir.glob("*.json"), reverse=True):
-        compile_course_objects_from_json(course_objects, sem_specific_data, json_path)
-    sem_agnostic_data = compile_semester_agnostic_data_from_course_objects(
-        course_objects
-    )
+        get_raw_course_data(json_path, all_course_data, sem_specific_data)
+    sem_agnostic_data = create_semester_agnostic_models(all_course_data)
+
     with session_factory() as session:
         session.add_all(sem_agnostic_data.course)
         session.commit()

@@ -287,11 +287,15 @@ def main(
     faculty_models = get_faculty_from_json(
         Path(code_mapping_dir) / os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
     )
+    generated_faculty_models = get_faculty_from_json(
+        Path(code_mapping_dir) / "generated_instructor_rcsid_name_map.json"
+    )
     with Session(engine) as session:
         session.add_all(restriction_models)
         session.add_all(attribute_models)
         session.add_all(subject_models)
         session.add_all(faculty_models)
+        session.add_all(generated_faculty_models)
         session.commit()
 
     sem_specific_data = SemesterSpecificData()

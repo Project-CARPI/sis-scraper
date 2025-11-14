@@ -248,22 +248,6 @@ def main(
     db_password: str,
     db_schema: str,
 ) -> None:
-    """
-    PSEUDOCODE (temporary)
-    initialize big data structure with lists for all models
-    for each json file (IN REVERSE CHRONOLOGICAL ORDER): DONE
-        for each department:
-            for each course:
-                add the entire course json object to the "big data structure"
-                    on duplicate ignore
-                extract semester-specific data and add that separately to the "big data structure"
-    after all json files processed:
-        for each model list in the "big data structure":
-            bulk insert into database
-            commit
-    have a nice day
-    """
-
     if isinstance(processed_data_dir, str):
         processed_data_dir = Path(processed_data_dir)
 

@@ -274,7 +274,7 @@ def main(
     generated_faculty_models = get_faculty_from_json(
         Path(code_mapping_dir) / "generated_instructor_rcsid_name_map.json"
     )
-    with Session(engine) as session:
+    with session_factory() as session:
         session.add_all(restriction_models)
         session.add_all(attribute_models)
         session.add_all(subject_models)
@@ -289,7 +289,7 @@ def main(
     sem_agnostic_data = compile_semester_agnostic_data_from_course_objects(
         course_objects
     )
-    with Session(engine) as session:
+    with session_factory() as session:
         session.add_all(sem_agnostic_data.course)
         session.commit()
         session.add_all(sem_agnostic_data.course_attribute)
@@ -327,7 +327,6 @@ def main(
         session.add_all(unique_course_faculty.values())
         session.commit()
 
-    # sem_agnostic_data = SemesterAgnosticData()
     engine.dispose()
 
 

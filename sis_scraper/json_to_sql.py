@@ -335,6 +335,7 @@ def main(
     restriction_code_name_map_path: Path | str,
     subject_code_name_map_path: Path | str,
 ) -> None:
+    # Convert string paths to Path objects if necessary
     if isinstance(processed_data_dir, str):
         processed_data_dir = Path(processed_data_dir)
     if isinstance(attribute_code_name_map_path, str):
@@ -350,6 +351,7 @@ def main(
     if isinstance(subject_code_name_map_path, str):
         subject_code_name_map_path = Path(subject_code_name_map_path)
 
+    # Initialize database connection
     engine, session_factory = init_db_connection(
         db_dialect, db_api, db_hostname, db_username, db_password, db_schema, echo=False
     )
@@ -367,6 +369,7 @@ def main(
     )
     subject_models = get_subjects_from_json(Path(subject_code_name_map_path))
 
+    # Insert code mappings into the database
     with session_factory() as session:
         session.add_all(restriction_models)
         session.add_all(attribute_models)
@@ -375,6 +378,7 @@ def main(
         session.add_all(generated_faculty_models)
         session.commit()
 
+    # Process raw course data and create models
     sem_specific_data = SemesterSpecificData()
     all_course_data = {}
     # Process JSON files in reverse chronological order to prioritize latest data
@@ -382,6 +386,7 @@ def main(
         get_raw_course_data(json_path, all_course_data, sem_specific_data)
     sem_agnostic_data = create_semester_agnostic_models(all_course_data)
 
+    # Insert course data into the database
     with session_factory() as session:
         session.add_all(sem_agnostic_data.course)
         session.commit()

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import carpi_data_model.models as models
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 _engine: Engine = None
 _session_factory: sessionmaker = None

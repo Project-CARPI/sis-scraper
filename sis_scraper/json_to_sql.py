@@ -66,7 +66,7 @@ def extract_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
     return year, semester
 
 
-def get_subjects_from_json(json_path: Path) -> list[models.Attribute]:
+def get_subjects_from_json(json_path: Path) -> list[models.Subject]:
     with open(json_path, "r", encoding="utf-8") as f:
         subject_data = json.load(f)
     return [

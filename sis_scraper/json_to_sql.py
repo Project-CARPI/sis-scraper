@@ -10,6 +10,11 @@ _session_factory: sessionmaker = None
 
 
 class SemesterAgnosticData:
+    """
+    A container for semester-agnostic models. These models are created from the
+    raw course data and are not specific to any semester.
+    """
+
     def __init__(self):
         self.course = []
         self.course_attribute = []
@@ -18,6 +23,11 @@ class SemesterAgnosticData:
 
 
 class SemesterSpecificData:
+    """
+    A container for semester-specific models. These models are created from the
+    raw course data and are specific to a particular semester.
+    """
+
     def __init__(self):
         self.course_offering = []
         self.course_faculty = []
@@ -32,6 +42,18 @@ def init_db_connection(
     db_schema: str,
     echo: bool = False,
 ) -> tuple[Engine, sessionmaker]:
+    """
+    Initializes the database connection and session factory.
+
+    @param db_dialect: Database dialect (e.g., "mysql").
+    @param db_api: Database API (e.g., "mysqlconnector").
+    @param db_hostname: Database hostname (e.g., "localhost:3306").
+    @param db_username: Database username.
+    @param db_password: Database password.
+    @param db_schema: Database schema name.
+    @param echo: Whether to log SQL statements.
+    @return: Tuple of (Engine, sessionmaker).
+    """
     global _engine, _session_factory
     if _engine is None:
         _engine = create_engine(
@@ -45,14 +67,32 @@ def init_db_connection(
 
 
 def generate_schema(engine: Engine) -> None:
+    """
+    Generates the database schema based on the models defined in models.py.
+
+    @param engine: SQLAlchemy Engine object.
+    """
     models.Base.metadata.create_all(engine)
 
 
 def drop_all_tables(engine: Engine) -> None:
+    """
+    Drops all tables in the database.
+
+    WARNING: This will delete all data in the database. Use with caution.
+
+    @param engine: SQLAlchemy Engine object.
+    """
     models.Base.metadata.drop_all(engine)
 
 
 def get_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
+    """
+    Converts a JSON filename like "202409.json" to a tuple of (2024, "FALL").
+
+    @param json_path: Path to the JSON file.
+    @return: Tuple of (year, semester).
+    """
     stem = json_path.stem
     year = int(stem[:4])
     semester_code = stem[4:]
@@ -67,6 +107,13 @@ def get_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
 
 
 def get_subjects_from_json(json_path: Path) -> list[models.Subject]:
+    """
+    Reads a subject code-name mapping from a JSON file and returns a list of
+    Subject models.
+
+    @param json_path: Path to the JSON file.
+    @return: List of Subject models.
+    """
     with open(json_path, "r", encoding="utf-8") as f:
         subject_data = json.load(f)
     return [
@@ -79,6 +126,13 @@ def get_subjects_from_json(json_path: Path) -> list[models.Subject]:
 
 
 def get_attributes_from_json(json_path: Path) -> list[models.Attribute]:
+    """
+    Reads an attribute code-name mapping from a JSON file and returns a list of
+    Attribute models.
+
+    @param json_path: Path to the JSON file.
+    @return: List of Attribute models.
+    """
     with open(json_path, "r", encoding="utf-8") as f:
         attribute_data = json.load(f)
     return [
@@ -91,6 +145,13 @@ def get_attributes_from_json(json_path: Path) -> list[models.Attribute]:
 
 
 def get_restrictions_from_json(json_path: Path) -> list[models.Restriction]:
+    """
+    Reads a restriction category-code-name mapping from a JSON file and returns
+    a list of Restriction models.
+
+    @param json_path: Path to the JSON file.
+    @return: List of Restriction models.
+    """
     with open(json_path, "r", encoding="utf-8") as f:
         restriction_data = json.load(f)
     restriction_models = []
@@ -107,6 +168,13 @@ def get_restrictions_from_json(json_path: Path) -> list[models.Restriction]:
 
 
 def get_faculty_from_json(json_path: Path) -> list[models.Faculty]:
+    """
+    Reads an instructor RCSID-name mapping from a JSON file and returns a list
+    of Faculty models.
+
+    @param json_path: Path to the JSON file.
+    @return: List of Faculty models.
+    """
     with open(json_path, "r", encoding="utf-8") as f:
         faculty_data = json.load(f)
     return [
@@ -124,6 +192,13 @@ def get_raw_course_data(
     all_course_data: dict[str, dict],
     sem_specific_data: SemesterSpecificData,
 ) -> None:
+    """
+    Reads raw course data from a JSON file and updates the provided data.
+
+    @param json_path: Path to the JSON file.
+    @param all_course_data: Dictionary to store semester-agnostic course data.
+    @param sem_specific_data: Object to store semester-specific models in.
+    """
     with open(json_path, "r", encoding="utf-8") as f:
         term_course_data = json.load(f)
     for _, subject_data in term_course_data.items():
@@ -165,6 +240,12 @@ def get_raw_course_data(
 def create_semester_agnostic_models(
     all_course_data: dict[str, dict],
 ) -> SemesterAgnosticData:
+    """
+    Creates semester-agnostic models from the provided course data.
+
+    @param all_course_data: Dictionary containing course data.
+    @return: SemesterAgnosticData object containing the created models.
+    """
     semester_agnostic_data = SemesterAgnosticData()
     for course_code, course_data in all_course_data.items():
         course_details = course_data["course_detail"]

@@ -52,7 +52,7 @@ def drop_all_tables(engine: Engine) -> None:
     models.Base.metadata.drop_all(engine)
 
 
-def extract_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
+def get_semester_info_from_filename(json_path: Path) -> tuple[int, str]:
     stem = json_path.stem
     year = int(stem[:4])
     semester_code = stem[4:]
@@ -133,7 +133,7 @@ def get_raw_course_data(
             if course_code not in all_course_data:
                 all_course_data[course_code] = course_data
             # Extract semester-specific data
-            year, semester = extract_semester_info_from_filename(json_path)
+            year, semester = get_semester_info_from_filename(json_path)
             subj_code, code_num = course_code.split(" ")
             seats_total = 0
             seats_filled = 0

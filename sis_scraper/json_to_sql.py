@@ -270,9 +270,9 @@ def main(
         subject_code_name_map_path = Path(subject_code_name_map_path)
 
     engine, session_factory = init_db_connection(
-        db_dialect, db_api, db_hostname, db_username, db_password, db_schema, echo=True
+        db_dialect, db_api, db_hostname, db_username, db_password, db_schema, echo=False
     )
-    # drop_all_tables(engine)
+    drop_all_tables(engine)
     generate_schema(engine)
 
     # Load and insert code mappings first since other tables depend on them

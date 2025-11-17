@@ -169,6 +169,9 @@ def post_process(
 
             # Restrictions
             for restriction_type in course_restriction_types:
+                # Skip special approvals
+                if restriction_type == "special_approval":
+                    continue
                 restriction_type_list = course_restriction_types[restriction_type]
                 for i, restriction in enumerate(restriction_type_list):
                     restriction_type_list[i] = codify_restriction(restriction)
@@ -297,7 +300,8 @@ def main(
             / "generated_instructor_rcsid_name_map.json"
         )
         logging.info(
-            f"Writing {len(generated_instructor_rcsid_name_map)} generated instructor RCSID mappings to {generated_map_path}"
+            f"Writing {len(generated_instructor_rcsid_name_map)} generated "
+            f"instructor RCSID mappings to {generated_map_path}"
         )
         with generated_map_path.open("w", encoding="utf-8") as f:
             json.dump(

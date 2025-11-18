@@ -177,6 +177,7 @@ cython_debug/
 .vscode/
 
 # Project Specific
+.DS_Store
 logs/
 data/
 scraper_data/

@@ -2,6 +2,7 @@ import datetime as dt
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
@@ -33,7 +34,13 @@ class ColoredFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-def init_logging(logs_dir: Path | str, log_level: int = logging.INFO) -> None:
+def init_logging(
+    logs_dir: Path | str,
+    log_level: int = logging.INFO,
+    retention_days: int = 5,
+    max_bytes: int = 5 * 1024 * 1024,
+    backup_count: int = 5,
+) -> None:
     """
     Initializes logging settings once on startup; these settings determine the
     behavior of all logging calls within this program.
@@ -49,32 +56,37 @@ def init_logging(logs_dir: Path | str, log_level: int = logging.INFO) -> None:
         "datefmt": "%H:%M:%S",
     }
     color_formatter = ColoredFormatter(**formatter_config)
-    formatter = logging.Formatter(**formatter_config)
+    default_formatter = logging.Formatter(**formatter_config)
 
-    # Root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
-
-    # Console logging
+    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(color_formatter)
-    root_logger.addHandler(console_handler)
 
-    # File logging
+    # Rotating file handler
     if not logs_dir.exists():
         logs_dir.mkdir()
         logging.info(f"No logs directory detected, creating one at {logs_dir}")
     for log in logs_dir.iterdir():
         create_time = dt.datetime.fromtimestamp(os.path.getctime(log))
-        if create_time < dt.datetime.now() - dt.timedelta(days=5):
+        if create_time < dt.datetime.now() - dt.timedelta(days=retention_days):
             log.unlink()
     curr_time = dt.datetime.now().strftime("%Y.%m.%d %H.%M.%S")
     logfile_path = logs_dir / f"{curr_time}.log"
     logfile_path.touch()
-    file_handler = logging.FileHandler(filename=logfile_path, encoding="utf-8")
+    file_handler = RotatingFileHandler(
+        filename=logfile_path,
+        encoding="utf-8",
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+    )
     file_handler.setLevel(log_level)
     # Normal Formatter is used instead of ColoredFormatter for file
     # logging because colors would just render as text.
-    file_handler.setFormatter(formatter)
+    file_handler.setFormatter(default_formatter)
+
+    # Add handlers to root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)

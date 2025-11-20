@@ -16,6 +16,8 @@ from tenacity import (
     wait_random_exponential,
 )
 
+logger = logging.getLogger(__name__)
+
 # Restriction data structure is dynamically generated based on values in this dictionary,
 # except for "Special Approvals", which is handled explicitly as a special case.
 _RESTRICTION_TYPE_MAP = {
@@ -66,7 +68,7 @@ def html_unescape(obj: Any) -> Any:
     stop=stop_after_attempt(3),
     wait=wait_random_exponential(multiplier=1.5) + wait_random(min=0, max=2),
     retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)),
-    before_sleep=lambda retry_state: logging.warning(
+    before_sleep=lambda retry_state: logger.warning(
         f"Retrying failed request (attempt {retry_state.attempt_number})"
     ),
 )
@@ -288,7 +290,7 @@ async def get_class_description(
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
     description_tag = soup.find("section", {"aria-labelledby": "courseDescription"})
     if description_tag is None:
-        logging.warning(f"No description found for term and CRN: {term} - {crn}")
+        logger.warning(f"No description found for term and CRN: {term} - {crn}")
         return ""
     description_text_list = [
         text.strip() for text in description_tag.get_text(separator="\n").split("\n")
@@ -376,7 +378,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     while i < len(restrictions_content):
         content = restrictions_content[i]
         if content.string is None:
-            logging.warning(
+            logger.warning(
                 "Skipping unexpected restriction content with no string for "
                 f"CRN {crn} in term {term}"
             )
@@ -398,7 +400,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         else:
             must_or_cannot, type_plural = header_match.groups()
             if type_plural not in _RESTRICTION_TYPE_MAP:
-                logging.warning(
+                logger.warning(
                     f"Skipping unknown restriction type '{type_plural}' for CRN {crn} "
                     f"in term {term}"
                 )
@@ -412,7 +414,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
         while i < len(restrictions_content):
             next_content = restrictions_content[i]
             if next_content.string is None:
-                logging.warning(
+                logger.warning(
                     f"Skipping unexpected restriction content with no string for "
                     f"CRN {crn} in term {term}"
                 )
@@ -502,7 +504,7 @@ async def get_class_prerequisites(
     #     try:
     #         return parse_prereq(term, crn, data)
     #     except Exception as e:
-    #         logging.error(
+    #         logger.error(
     #             f"Error parsing prerequisites for CRN {crn} in term {term} "
     #             f"with data: {data}\n{e}"
     #         )
@@ -546,7 +548,7 @@ async def get_class_corequisites(
     thead_cols = [th.text.strip() for th in coreqs_thead.find_all("th")]
     # Known corequisite columns are Subject, Course, and Title
     if len(thead_cols) != 3:
-        logging.warning(
+        logger.warning(
             f"Unexpected number of corequisite columns for CRN {crn} in term {term}"
         )
         return []
@@ -554,7 +556,7 @@ async def get_class_corequisites(
     for tr in coreqs_tbody.find_all("tr"):
         cols = [td.text.strip() for td in tr.find_all("td")]
         if len(cols) != len(thead_cols):
-            logging.warning(
+            logger.warning(
                 f"Skipping unexpected corequisite row with mismatched columns for "
                 f"CRN {crn} in term {term}"
             )
@@ -599,7 +601,7 @@ async def get_class_crosslists(
     thead_cols = [th.text.strip() for th in crosslists_thead.find_all("th")]
     # Known crosslist columns are CRN, Subject, Course Number, Title, and Section
     if len(thead_cols) != 5:
-        logging.warning(
+        logger.warning(
             f"Unexpected number of crosslist columns for term and CRN: {term} - {crn}"
         )
         return []
@@ -607,7 +609,7 @@ async def get_class_crosslists(
     for tr in crosslists_tbody.find_all("tr"):
         cols = [td.text.strip() for td in tr.find_all("td")]
         if len(cols) != len(thead_cols):
-            logging.warning(
+            logger.warning(
                 f"Skipping unexpected crosslist row with mismatched columns for "
                 f"CRN {crn} in term {term}"
             )

@@ -20,6 +20,8 @@ from sis_api import (
     reset_class_search,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def get_term_code(year: str | int, season: str) -> str:
     """
@@ -145,7 +147,7 @@ async def process_class_details(
             for attribute in attributes_data:
                 attribute_split = attribute.split()
                 if len(attribute_split) < 2:
-                    logging.warning(
+                    logger.warning(
                         f"Skipping unexpected attribute format for CRN {crn} "
                         f"in term {term}: {attribute}"
                     )
@@ -156,7 +158,7 @@ async def process_class_details(
                     attribute_code in attribute_code_name_map
                     and attribute_code_name_map[attribute_code] != attribute_name
                 ):
-                    logging.warning(
+                    logger.warning(
                         f"Conflicting attribute names for {attribute_code} "
                         f"in term {term}: "
                         f"{attribute_code_name_map[attribute_code]} vs. {attribute_name}"
@@ -186,7 +188,7 @@ async def process_class_details(
                         ]
                         != restriction_name
                     ):
-                        logging.warning(
+                        logger.warning(
                             f"Conflicting restriction names for {restriction_code} "
                             f"in term {term}: "
                             f"{restriction_code_name_map[
@@ -232,7 +234,7 @@ async def process_class_details(
                 if instructor_rcsid_name_map is not None:
                     instructor_rcsid_name_map[rcsid] = instructor["displayName"]
         else:
-            logging.warning(
+            logger.warning(
                 f"Missing instructor email address field for CRN {crn} "
                 f"in term {term}: {instructor_name}"
             )
@@ -317,7 +319,7 @@ async def get_course_data(
                 # Return data sorted by course code
                 return dict(sorted(course_data.items()))
             except aiohttp.ClientError as e:
-                logging.error(f"Error processing subject {subject} in term {term}: {e}")
+                logger.error(f"Error processing subject {subject} in term {term}: {e}")
                 return {}
 
 
@@ -360,7 +362,7 @@ async def get_term_course_data(
         async with aiohttp.ClientSession(timeout=timeout_obj) as session:
             subjects = await get_term_subjects(session, term)
     except aiohttp.ClientError as e:
-        logging.error(f"Error fetching subjects for term {term}: {e}")
+        logger.error(f"Error fetching subjects for term {term}: {e}")
         return False
 
     # Build subject code to name map
@@ -370,14 +372,14 @@ async def get_term_course_data(
                 subject["code"] in subject_code_name_map
                 and subject_code_name_map[subject["code"]] != subject["description"]
             ):
-                logging.warning(
+                logger.warning(
                     f"Conflicting subject names for {subject['code']} "
                     f"in term {term}: "
                     f"{subject_code_name_map[subject['code']]} "
                     f"vs. {subject['description']}"
                 )
             subject_code_name_map[subject["code"]] = subject["description"]
-    logging.info(f"Processing {len(subjects)} subjects for term: {term}")
+    logger.info(f"Processing {len(subjects)} subjects for term: {term}")
 
     # Stores all course data for the term
     term_course_data = {}
@@ -406,7 +408,7 @@ async def get_term_course_data(
                 )
                 tasks.append(task)
     except Exception as e:
-        logging.error(f"Error processing subjects for term {term}: {e}")
+        logger.error(f"Error processing subjects for term {term}: {e}")
         return False
 
     # Wait for all tasks to complete and gather results
@@ -422,11 +424,11 @@ async def get_term_course_data(
         output_path = Path(output_path)
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Writing data to {output_path}")
+        logger.info(f"Writing data to {output_path}")
         with output_path.open("w", encoding="utf-8") as f:
             json.dump(term_course_data, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        logging.error(f"Error writing data to {output_path}: {e}")
+        logger.error(f"Error writing data to {output_path}: {e}")
         return False
 
     return True
@@ -487,7 +489,7 @@ async def main(
     """
 
     if output_data_dir is None:
-        logging.error("No data output directory specified")
+        logger.error("No data output directory specified")
         return False
 
     # Convert paths to Path objects if given as strings
@@ -518,12 +520,12 @@ async def main(
         if attribute_code_name_map_path and attribute_code_name_map_path.exists():
             with attribute_code_name_map_path.open("r", encoding="utf-8") as f:
                 attribute_code_name_map = json.load(f)
-            logging.info(
+            logger.info(
                 f"Loaded {len(attribute_code_name_map)} attribute code mappings "
                 f"from {attribute_code_name_map_path}"
             )
         elif attribute_code_name_map_path:
-            logging.info(
+            logger.info(
                 f"No existing attribute code mappings found "
                 f"at {attribute_code_name_map_path}"
             )
@@ -531,12 +533,12 @@ async def main(
         if instructor_rcsid_name_map_path and instructor_rcsid_name_map_path.exists():
             with instructor_rcsid_name_map_path.open("r", encoding="utf-8") as f:
                 instructor_rcsid_name_map = json.load(f)
-            logging.info(
+            logger.info(
                 f"Loaded {len(instructor_rcsid_name_map)} instructor RCSID mappings "
                 f"from {instructor_rcsid_name_map_path}"
             )
         elif instructor_rcsid_name_map_path:
-            logging.info(
+            logger.info(
                 f"No existing instructor RCSID mappings found "
                 f"at {instructor_rcsid_name_map_path}"
             )
@@ -544,12 +546,12 @@ async def main(
         if restriction_code_name_map_path and restriction_code_name_map_path.exists():
             with restriction_code_name_map_path.open("r", encoding="utf-8") as f:
                 restriction_code_name_map = json.load(f)
-            logging.info(
+            logger.info(
                 f"Loaded {len(restriction_code_name_map)} restriction code mappings "
                 f"from {restriction_code_name_map_path}"
             )
         elif restriction_code_name_map_path:
-            logging.info(
+            logger.info(
                 f"No existing restriction code mappings found "
                 f"at {restriction_code_name_map_path}"
             )
@@ -557,17 +559,17 @@ async def main(
         if subject_code_name_map_path and subject_code_name_map_path.exists():
             with subject_code_name_map_path.open("r", encoding="utf-8") as f:
                 subject_code_name_map = json.load(f)
-            logging.info(
+            logger.info(
                 f"Loaded {len(subject_code_name_map)} subject code mappings "
                 f"from {subject_code_name_map_path}"
             )
         elif subject_code_name_map_path:
-            logging.info(
+            logger.info(
                 f"No existing subject code mappings found "
                 f"at {subject_code_name_map_path}"
             )
     except Exception as e:
-        logging.error(f"Error loading code mapping files: {e}")
+        logger.error(f"Error loading code mapping files: {e}")
         import traceback
 
         traceback.print_exc()
@@ -576,11 +578,11 @@ async def main(
     # Limit concurrent client sessions and simultaneous connections
     semaphore = asyncio.Semaphore(semaphore_val)
 
-    logging.info("Starting SIS scraper with settings:")
-    logging.info(f"  Years: {start_year} - {end_year}")
-    logging.info(f"  Seasons: {', '.join(season.capitalize() for season in seasons)}")
-    logging.info(f"  Max concurrent sessions: {semaphore._value}")
-    logging.info(f"  Max concurrent connections per session: {limit_per_host}")
+    logger.info("Starting SIS scraper with settings:")
+    logger.info(f"  Years: {start_year} - {end_year}")
+    logger.info(f"  Seasons: {', '.join(season.capitalize() for season in seasons)}")
+    logger.info(f"  Max concurrent sessions: {semaphore._value}")
+    logger.info(f"  Max concurrent connections per session: {limit_per_host}")
 
     tasks: list[asyncio.Task] = []
     num_terms_processed = 0
@@ -615,7 +617,7 @@ async def main(
                 num_terms_processed += 1
 
     except Exception as e:
-        logging.error(f"Error in SIS scraper: {e}")
+        logger.error(f"Error in SIS scraper: {e}")
         import traceback
 
         traceback.print_exc()
@@ -626,7 +628,7 @@ async def main(
         if attribute_code_name_map_path:
             attribute_code_name_map_path.parent.mkdir(parents=True, exist_ok=True)
             attribute_code_name_map = dict(sorted(attribute_code_name_map.items()))
-            logging.info(
+            logger.info(
                 f"Writing {len(attribute_code_name_map)} attribute code mappings "
                 f"to {attribute_code_name_map_path}"
             )
@@ -636,7 +638,7 @@ async def main(
         if instructor_rcsid_name_map_path:
             instructor_rcsid_name_map_path.parent.mkdir(parents=True, exist_ok=True)
             instructor_rcsid_name_map = dict(sorted(instructor_rcsid_name_map.items()))
-            logging.info(
+            logger.info(
                 f"Writing {len(instructor_rcsid_name_map)} instructor RCSID mappings "
                 f"to {instructor_rcsid_name_map_path}"
             )
@@ -646,7 +648,7 @@ async def main(
         if restriction_code_name_map_path:
             restriction_code_name_map_path.parent.mkdir(parents=True, exist_ok=True)
             restriction_code_name_map = dict(sorted(restriction_code_name_map.items()))
-            logging.info(
+            logger.info(
                 f"Writing {len(restriction_code_name_map)} restriction code mappings "
                 f"to {restriction_code_name_map_path}"
             )
@@ -656,22 +658,22 @@ async def main(
         if subject_code_name_map_path:
             subject_code_name_map_path.parent.mkdir(parents=True, exist_ok=True)
             subject_code_name_map = dict(sorted(subject_code_name_map.items()))
-            logging.info(
+            logger.info(
                 f"Writing {len(subject_code_name_map)} subject code mappings "
                 f"to {subject_code_name_map_path}"
             )
             with subject_code_name_map_path.open("w", encoding="utf-8") as f:
                 json.dump(subject_code_name_map, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        logging.error(f"Error writing code mapping files: {e}")
+        logger.error(f"Error writing code mapping files: {e}")
         import traceback
 
         traceback.print_exc()
         return False
 
     end_time = time.time()
-    logging.info("SIS scraper completed")
-    logging.info(f"  Terms processed: {num_terms_processed}")
-    logging.info(f"  Time elapsed: {end_time - start_time:.2f} seconds")
+    logger.info("SIS scraper completed")
+    logger.info(f"  Terms processed: {num_terms_processed}")
+    logger.info(f"  Time elapsed: {end_time - start_time:.2f} seconds")
 
     return True

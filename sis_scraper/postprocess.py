@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 
 def codify_course_code(course_code: str, subject_code_name_map: dict[str, str]) -> str:
     """
@@ -18,7 +20,7 @@ def codify_course_code(course_code: str, subject_code_name_map: dict[str, str]) 
     course_pattern = r"(.+) (\d{4})"
     match = re.match(course_pattern, course_code)
     if match is None or len(match.groups()) != 2:
-        logging.warning(f"Unexpected course code format: {course_code}")
+        logger.warning(f"Unexpected course code format: {course_code}")
         return course_code
 
     subject_name = match.group(1)
@@ -44,7 +46,7 @@ def codify_attribute(attribute: str) -> str:
     attribute_pattern = r"(.+)  (.+)"
     match = re.match(attribute_pattern, attribute)
     if match is None or len(match.groups()) != 2:
-        logging.warning(f"Unexpected attribute format: {attribute}")
+        logger.warning(f"Unexpected attribute format: {attribute}")
         return attribute
     attribute_code = match.group(2)
     return attribute_code
@@ -63,7 +65,7 @@ def codify_restriction(restriction: str) -> str:
     restriction_pattern = r"(.+)\s*\((.+)\)"
     match = re.match(restriction_pattern, restriction)
     if match is None or len(match.groups()) != 2:
-        logging.warning(f"Unexpected restriction format: {restriction}")
+        logger.warning(f"Unexpected restriction format: {restriction}")
         return restriction
     restriction_code = match.group(2)
     return restriction_code
@@ -87,7 +89,7 @@ def generate_rcsid(
     instructor_name_pattern = r"(.+), (.+)"
     match = re.match(instructor_name_pattern, instructor_name)
     if match is None or len(match.groups()) != 2:
-        logging.warning(f"Unexpected instructor name format: {instructor_name}")
+        logger.warning(f"Unexpected instructor name format: {instructor_name}")
         return instructor_name
     # An RCSID is composed of up to the first 5 letters of the last name, followed by
     # the first name initial, as well as a number if needed to ensure uniqueness.
@@ -183,7 +185,7 @@ def post_process(
                 for i, instructor in enumerate(instructor_list):
                     match = re.match(instructor_pattern, instructor)
                     if match is None or len(match.groups()) != 3:
-                        logging.warning(
+                        logger.warning(
                             f"Unexpected instructor name and RCSID format: {instructor}"
                         )
                         continue
@@ -231,7 +233,7 @@ def main(
             subject_code_name_map_path,
         )
     ):
-        logging.error("One or more required directories are not specified.")
+        logger.error("One or more required directories are not specified.")
         return False
 
     # Convert to Path objects if necessary
@@ -250,7 +252,7 @@ def main(
 
     # Validate input directories
     if not output_data_dir.exists() or not output_data_dir.is_dir():
-        logging.error(f"Output data directory {output_data_dir} does not exist.")
+        logger.error(f"Output data directory {output_data_dir} does not exist.")
         return False
 
     # Validate mapping files
@@ -261,7 +263,7 @@ def main(
         subject_code_name_map_path,
     ]:
         if not map_path.exists() or map_path.is_dir():
-            logging.error(f"Mapping file {map_path} does not exist or is a directory.")
+            logger.error(f"Mapping file {map_path} does not exist or is a directory.")
             return False
 
     # Load code mappings
@@ -289,7 +291,7 @@ def main(
 
         # Write processed data
         processed_file_path = processed_output_data_dir / term_file.name
-        logging.info(f"Writing processed data to {processed_file_path}")
+        logger.info(f"Writing processed data to {processed_file_path}")
         with processed_file_path.open("w", encoding="utf-8") as f:
             json.dump(term_course_data, f, indent=4, ensure_ascii=False)
 
@@ -299,7 +301,7 @@ def main(
             instructor_rcsid_name_map_path.parent
             / "generated_instructor_rcsid_name_map.json"
         )
-        logging.info(
+        logger.info(
             f"Writing {len(generated_instructor_rcsid_name_map)} generated "
             f"instructor RCSID mappings to {generated_map_path}"
         )

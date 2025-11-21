@@ -50,6 +50,9 @@ def html_unescape(obj: Any) -> Any:
     """
     Recursively unescape HTML entities in all string values within a complex
     structure (dicts, lists, tuples, sets). Dictionary keys are unescaped too.
+
+    @param obj: The object to recursively unescape.
+    @return: The same object with all string values unescaped.
     """
     if isinstance(obj, str):
         return html.unescape(obj)
@@ -98,7 +101,9 @@ async def get_term_subjects(
     Fetches the list of subjects and codes for a given term from SIS. If the
     term is invalid or doesn't exist, returns an empty list.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch subjects for (e.g. "202509" for Fall 2025).
+    @return: A list of dictionaries containing subject codes and descriptions.
     ```
     [
         {
@@ -124,7 +129,11 @@ async def get_term_instructors(
     Fetches the list of instructors for a given term from SIS. If the term is
     invalid or doesn't exist, returns an empty list.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch instructors for (e.g. "202509" for Fall
+        2025).
+    @return: A list of dictionaries containing instructor codes and
+        descriptions.
     ```
     [
         {
@@ -153,7 +162,10 @@ async def get_all_attributes(
     by courses. For example, "FRSH" and "ONLI" are known attributes that are
     missing from this list.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param search_term: An optional search term to filter attributes by.
+    @return: A list of dictionaries containing attribute codes and
+        descriptions.
     ```
     [
         {
@@ -179,7 +191,9 @@ async def get_all_colleges(
     Fetches the master list of colleges (schools) and codes from SIS. Not to be
     confused with campuses.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param search_term: An optional search term to filter colleges by.
+    @return: A list of dictionaries containing college codes and descriptions.
     ```
     [
         {
@@ -203,9 +217,11 @@ async def get_all_campuses(
 ) -> list[dict[str, str]]:
     """
     Fetches the master list of campuses and codes from SIS. Not to be confused
-    with colleges (schools).
+    with colleges (School of Architecture, School of Science, etc.).
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param search_term: An optional search term to filter campuses by.
+    @return: A list of dictionaries containing campus codes and descriptions.
     ```
     [
         {
@@ -224,18 +240,39 @@ async def get_all_campuses(
     return data
 
 
-async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
+async def init_class_search(session: aiohttp.ClientSession, term: str) -> None:
     """
-    Resets the term and subject search state on the SIS server.
+    Initializes the term and subject search state on the SIS server for the
+    given session.
 
-    Must be called before each attempt to fetch classes from a subject in the
-    given term. Otherwise, the server will continue returning the same results
-    from the last subject accessed, or no data if attempting to access data
-    from a different term.
+    Must be called before attempting to fetch subjects or classes for a term.
+    Only needs to be called once per term, but the subject search state must be
+    reset before each attempt to fetch classes from a subject after the first
+    attempt. Otherwise, the server will continue returning the same results
+    from the last subject accessed.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to initialize search state for (e.g. "202509" for
+        Fall 2025).
     """
     url = _BASE_URL + "term/search"
     params = {"mode": "search", "term": term}
     await retry_get(session, url, params)
+
+
+async def reset_class_search(session: aiohttp.ClientSession) -> None:
+    """
+    Resets the subject search state on the SIS server for the given session.
+
+    Must be called after initializing the term and subject search state, and
+    before each attempt to fetch classes from a subject after the first
+    attempt. Otherwise, the server will continue returning the same results
+    from the last subject accessed.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    """
+    url = _BASE_URL + "classSearch/resetDataForm"
+    await retry_get(session, url, params={})
 
 
 async def class_search(
@@ -252,7 +289,14 @@ async def class_search(
     The term and subject search state on the SIS server must be reset before
     each call to this function.
 
-    Returned data format is very large; see docs for details.
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch classes for (e.g. "202509" for Fall 2025).
+    @param subject: The subject to fetch classes for (e.g. "CSCI").
+    @param max_size: The maximum number of classes to return.
+    @param sort_column: The column to sort results by.
+    @param sort_asc: Whether to sort in ascending order.
+    @return: A list of dictionaries containing class data. If the term or \
+        subject is invalid, returns an empty list.
     """
     url = _BASE_URL + "searchResults/searchResults"
     params = {
@@ -282,6 +326,12 @@ async def get_class_description(
     Returns a string containing the course description, without any
     additional fields such as "When Offered", "Credit Hours", "Prerequisite",
     etc.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch the class description for (e.g. "202509" for
+        Fall 2025).
+    @param crn: The course reference number to fetch the class description for.
+    @return: A string containing the course description.
     """
     url = _BASE_URL + "searchResults/getCourseDescription"
     params = {"term": term, "courseReferenceNumber": crn}
@@ -306,7 +356,11 @@ async def get_class_attributes(
     """
     Fetches and parses data from the "Attributes" tab of a class details page.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch class attributes for (e.g. "202509" for Fall
+        2025).
+    @param crn: The course reference number to fetch class attributes for.
+    @return: A list of strings containing class attributes.
     ```
     [
         "Attribute 1",
@@ -333,7 +387,11 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     Fetches and parses data from the "Restrictions" tab of a class details
     page.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch class restrictions for (e.g. "202509" for
+        Fall 2025).
+    @param crn: The course reference number to fetch class restrictions for.
+    @return: A dictionary containing class restrictions.
     ```
     {
         "major": ["Allowed Major 1", ...],
@@ -454,7 +512,11 @@ async def get_class_prerequisites(
     Fetches and parses data from the "Prerequisites" tab of a class details
     page.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch class prerequisites for (e.g. "202509" for
+        Fall 2025).
+    @param crn: The course reference number to fetch class prerequisites for.
+    @return: A dictionary containing class prerequisites.
     ```
     {
         "id": 0,
@@ -523,7 +585,11 @@ async def get_class_corequisites(
     Fetches and parses data from the "Corequisites" tab of a class details
     page.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch class corequisites for (e.g. "202509" for
+        Fall 2025).
+    @param crn: The course reference number to fetch class corequisites for.
+    @return: A list of strings containing class corequisites.
     ```
     [
         "Computer Science 1100",
@@ -576,7 +642,11 @@ async def get_class_crosslists(
     Fetches and parses data from the "Cross Listed" tab of a class details
     page.
 
-    Returned data format is as follows:
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to fetch class crosslists for (e.g. "202509" for Fall
+        2025).
+    @param crn: The course reference number to fetch class crosslists for.
+    @return: A list of strings containing class crosslists.
     ```
     [
         "Computer Science 1100",

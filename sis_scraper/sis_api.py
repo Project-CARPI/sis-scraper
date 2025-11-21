@@ -203,7 +203,7 @@ async def get_all_campuses(
 ) -> list[dict[str, str]]:
     """
     Fetches the master list of campuses and codes from SIS. Not to be confused
-    with colleges (schools).
+    with colleges (School of Architecture, School of Science, etc.).
 
     Returned data format is as follows:
     ```

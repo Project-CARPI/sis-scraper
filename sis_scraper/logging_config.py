@@ -44,6 +44,12 @@ def init_logging(
     """
     Initializes logging settings once on startup; these settings determine the
     behavior of all logging calls within this program.
+
+    @param logs_dir: Directory where log files will be stored.
+    @param log_level: Minimum logging level to be logged.
+    @param retention_days: Number of days to keep log files before deletion.
+    @param max_bytes: Maximum size of a log file in bytes before rotation.
+    @param backup_count: Number of backup log files to keep after rotation.
     """
     if logs_dir is None:
         raise ValueError("logs_dir must be specified")

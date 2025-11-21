@@ -73,7 +73,7 @@ def init_logging(
     if not logs_dir.exists():
         logs_dir.mkdir(parents=True)
         logging.info(f"No logs directory detected, creating one at {logs_dir}")
-    for log in logs_dir.iterdir():
+    for log in logs_dir.glob("*.log"):
         create_time = dt.datetime.fromtimestamp(os.path.getctime(log))
         if create_time < dt.datetime.now() - dt.timedelta(days=retention_days):
             log.unlink()

@@ -324,6 +324,7 @@ async def get_class_description(
     additional fields such as "When Offered", "Credit Hours", "Prerequisite",
     etc.
 
+    @param session: An aiohttp ClientSession to use for the request.
     @param term: The term to fetch the class description for (e.g. "202509" for
         Fall 2025).
     @param crn: The course reference number to fetch the class description for.

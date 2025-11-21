@@ -246,7 +246,10 @@ async def init_class_search(session: aiohttp.ClientSession, term: str) -> None:
     given session.
 
     Must be called before attempting to fetch subjects or classes for a term.
-    Only needs to be called once per term.
+    Only needs to be called once per term, but the subject search state must be
+    reset before each attempt to fetch classes from a subject after the first
+    attempt. Otherwise, the server will continue returning the same results
+    from the last subject accessed.
 
     @param session: An aiohttp ClientSession to use for the request.
     @param term: The term to initialize search state for (e.g. "202509" for

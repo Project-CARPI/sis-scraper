@@ -71,7 +71,7 @@ def init_logging(
 
     # Rotating file handler
     if not logs_dir.exists():
-        logs_dir.mkdir()
+        logs_dir.mkdir(parents=True)
         logging.info(f"No logs directory detected, creating one at {logs_dir}")
     for log in logs_dir.iterdir():
         create_time = dt.datetime.fromtimestamp(os.path.getctime(log))

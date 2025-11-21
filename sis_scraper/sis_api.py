@@ -224,18 +224,36 @@ async def get_all_campuses(
     return data
 
 
-async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
+async def init_class_search(session: aiohttp.ClientSession, term: str) -> None:
     """
-    Resets the term and subject search state on the SIS server.
+    Initializes the term and subject search state on the SIS server for the
+    given session.
 
-    Must be called before each attempt to fetch classes from a subject in the
-    given term. Otherwise, the server will continue returning the same results
-    from the last subject accessed, or no data if attempting to access data
-    from a different term.
+    Must be called before attempting to fetch subjects or classes for a term.
+    Only needs to be called once per term.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term to initialize search state for (e.g. "202509" for
+        Fall 2025).
     """
     url = _BASE_URL + "term/search"
     params = {"mode": "search", "term": term}
     await retry_get(session, url, params)
+
+
+async def reset_class_search(session: aiohttp.ClientSession) -> None:
+    """
+    Resets the subject search state on the SIS server for the given session.
+
+    Must be called after initializing the term and subject search state, and
+    before each attempt to fetch classes from a subject after the first
+    attempt. Otherwise, the server will continue returning the same results
+    from the last subject accessed.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    """
+    url = _BASE_URL + "classSearch/resetDataForm"
+    await retry_get(session, url, params={})
 
 
 async def class_search(

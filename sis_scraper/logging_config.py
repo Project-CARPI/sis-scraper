@@ -70,13 +70,9 @@ def init_logging(
     console_handler.setFormatter(color_formatter)
 
     # Rotating file handler
-    if not logs_dir.exists():
+    logs_dir_exists = logs_dir.exists()
+    if not logs_dir_exists:
         logs_dir.mkdir(parents=True)
-        logging.info(f"No logs directory detected, creating one at {logs_dir}")
-    for log in logs_dir.glob("*.log"):
-        create_time = dt.datetime.fromtimestamp(os.path.getctime(log))
-        if create_time < dt.datetime.now() - dt.timedelta(days=retention_days):
-            log.unlink()
     curr_time = dt.datetime.now().strftime("%Y.%m.%d %H.%M.%S")
     logfile_path = logs_dir / f"{curr_time}.log"
     file_handler = RotatingFileHandler(
@@ -95,3 +91,16 @@ def init_logging(
     root_logger.setLevel(log_level)
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
+
+    # Log log directory creation after handlers are added
+    if not logs_dir_exists:
+        logging.info(f"Created logs directory at {logs_dir}")
+
+    # Clean up old log files
+    for log in logs_dir.glob("*.log"):
+        try:
+            create_time = dt.datetime.fromtimestamp(os.path.getctime(log))
+            if create_time < dt.datetime.now() - dt.timedelta(days=retention_days):
+                log.unlink()
+        except Exception as e:
+            logging.warning(f"Failed to delete old log file {log}: {e}")

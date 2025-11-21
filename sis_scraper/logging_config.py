@@ -79,7 +79,6 @@ def init_logging(
             log.unlink()
     curr_time = dt.datetime.now().strftime("%Y.%m.%d %H.%M.%S")
     logfile_path = logs_dir / f"{curr_time}.log"
-    logfile_path.touch()
     file_handler = RotatingFileHandler(
         filename=logfile_path,
         encoding="utf-8",

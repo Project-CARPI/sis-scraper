@@ -39,7 +39,7 @@ def init_logging(
     log_level: int = logging.INFO,
     retention_days: int = 5,
     max_bytes: int = 5 * 1024 * 1024,
-    backup_count: int = 5,
+    backup_count: int = 10,
 ) -> None:
     """
     Initializes logging settings once on startup; these settings determine the

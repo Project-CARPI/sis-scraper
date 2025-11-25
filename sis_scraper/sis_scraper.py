@@ -17,7 +17,7 @@ from sis_api import (
     get_class_prerequisites,
     get_class_restrictions,
     get_term_subjects,
-    reset_class_search,
+    init_class_search,
 )
 
 logger = logging.getLogger(__name__)
@@ -300,8 +300,8 @@ async def get_course_data(
             connector=connector, timeout=timeout_obj
         ) as session:
             try:
-                # Reset search state on server before fetching class data
-                await reset_class_search(session, term)
+                # Initialize search state on server before fetching class data
+                await init_class_search(session, term)
                 class_data = await class_search(session, term, subject)
                 course_data = {}
                 async with asyncio.TaskGroup() as tg:

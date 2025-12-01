@@ -309,9 +309,9 @@ async def get_class_attributes(
     Returned data format is as follows:
     ```
     [
-        "Attribute 1",
-        "Attribute 2",
-        "Attribute 3",
+        "Communication Intensive  COMM",
+        "Data Intensive I  DI1",
+        "Introductory Level Course  FRSH",
         ...
     ]
     ```
@@ -336,12 +336,23 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     Returned data format is as follows:
     ```
     {
-        "major": ["Allowed Major 1", ...],
-        "not_major": ["Disallowed Major 1", ...],
-        "level": ["Allowed Level 1", ...],
-        "not_level": ["Disallowed Level 1", ...],
-        "classification": ["Allowed Classification 1", ...],
-        "not_classification": ["Disallowed Classification 1", ...]
+        "major": [
+            "Architecture (ARCH)",
+            ...
+        ],
+        "not_major": [
+            "Computer Science (CSCI)",
+            ...
+        ],
+        "classification": [
+            "Freshman (FR)",
+            ...
+        ],
+        "not_classification": [
+            "Senior (SR)",
+            ...
+        ],
+        ...
     }
     ```
     """
@@ -350,7 +361,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
-    # Dynamically build restrictions_data dict structure from RESTRICTION_TYPE_MAP values
+    # Dynamically build dict structure from RESTRICTION_TYPE_MAP values
     restrictions_data = {}
     bases = set(_RESTRICTION_TYPE_MAP.values())
     for base in sorted(bases):
@@ -526,8 +537,11 @@ async def get_class_corequisites(
     Returned data format is as follows:
     ```
     [
-        "Computer Science 1100",
-        "Mathematics 1010",
+        {
+            "subjectName": "Computer Science",
+            "courseNumber": "1100",
+            "title": "COMPUTER SCIENCE I"
+        },
         ...
     ]
     ```
@@ -546,7 +560,7 @@ async def get_class_corequisites(
     if not coreqs_thead or not coreqs_tbody:
         return []
     thead_cols = [th.text.strip() for th in coreqs_thead.find_all("th")]
-    # Known corequisite columns are Subject, Course, and Title
+    # Known corequisite columns are Subject, Course Number, and Title
     if len(thead_cols) != 3:
         logger.warning(
             f"Unexpected number of corequisite columns for CRN {crn} in term {term}"
@@ -561,9 +575,10 @@ async def get_class_corequisites(
                 f"CRN {crn} in term {term}"
             )
             continue
-        subject = cols[0]
-        course_num = cols[1]
-        coreqs.append(f"{subject} {course_num}")
+        subject, course_num, title = cols
+        coreqs.append(
+            {"subjectName": subject, "courseNumber": course_num, "title": title}
+        )
     return coreqs
 
 
@@ -579,8 +594,13 @@ async def get_class_crosslists(
     Returned data format is as follows:
     ```
     [
-        "Computer Science 1100",
-        "Mathematics 1010",
+        {
+            "courseReferenceNumber": "12345",
+            "subjectName": "Computer Science",
+            "courseNumber": "1100",
+            "title": "COMPUTER SCIENCE I",
+            "sectionNumber": "01"
+        },
         ...
     ]
     ```
@@ -614,7 +634,14 @@ async def get_class_crosslists(
                 f"CRN {crn} in term {term}"
             )
             continue
-        subject = cols[1]
-        code = cols[2]
-        crosslists.append(f"{subject} {code}")
+        crn, subject, course_num, title, section_num = cols
+        crosslists.append(
+            {
+                "courseReferenceNumber": crn,
+                "subjectName": subject,
+                "courseNumber": course_num,
+                "title": title,
+                "sectionNumber": section_num,
+            }
+        )
     return crosslists

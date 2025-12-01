@@ -54,7 +54,7 @@ def get_term_code(year: str | int, season: str) -> str:
 async def process_class_details(
     session: aiohttp.ClientSession,
     course_data: dict[str, Any],
-    class_entry: dict[str, Any],
+    sis_class_entry: dict[str, Any],
     instructor_rcsid_name_map: dict[str, str] = None,
     attribute_code_name_map: dict[str, str] = None,
     restriction_code_name_map: dict[str, dict[str, str]] = None,
@@ -67,7 +67,8 @@ async def process_class_details(
 
     @param session: aiohttp client session to use for requests.
     @param course_data: Dictionary to populate with course data.
-    @param class_entry: Class data fetched from SIS's class search endpoint.
+    @param sis_class_entry: Class data fetched from SIS's class search
+        endpoint.
     @param known_rcsid_set: Optional set to populate with known instructor
         RCSIDs.
     @param attribute_code_name_map: Optional map to populate with attribute
@@ -76,182 +77,149 @@ async def process_class_details(
         codes to names.
     @return: None
     """
-    # Example course code: CSCI 1100
-    course_code = f"{class_entry['subject']} {class_entry['courseNumber']}"
-    term = class_entry["term"]
-    crn = class_entry["courseReferenceNumber"]
+    course_num = sis_class_entry["courseNumber"]
+    term = sis_class_entry["term"]
+    crn = sis_class_entry["courseReferenceNumber"]
+
+    # Initialize course entry if not already present
+    if course_num not in course_data:
+        course_data[course_num] = []
+
+    # Initialize empty class entry
+    class_entry = {
+        "courseReferenceNumber": sis_class_entry["courseReferenceNumber"],
+        "sectionNumber": sis_class_entry["sequenceNumber"],
+        "title": sis_class_entry["courseTitle"],
+        "description": "",
+        "attributes": [],
+        "restrictions": {},
+        "prerequisites": [],
+        "corequisites": [],
+        "crosslists": [],
+        "creditMin": sis_class_entry["creditHourLow"] or 0,
+        "creditMax": sis_class_entry["creditHourHigh"] or 0,
+        "faculty": [],
+        "seatsCapacity": sis_class_entry["maximumEnrollment"],
+        "seatsRegistered": sis_class_entry["enrollment"],
+        "seatsAvailable": sis_class_entry["seatsAvailable"],
+    }
 
     # Fetch class details not included in main class details
-    # Only fetch if course not already in course data
-    if course_code not in course_data:
+    async with asyncio.TaskGroup() as tg:
+        description_task = tg.create_task(get_class_description(session, term, crn))
+        attributes_task = tg.create_task(get_class_attributes(session, term, crn))
+        restrictions_task = tg.create_task(get_class_restrictions(session, term, crn))
+        prerequisites_task = tg.create_task(get_class_prerequisites(session, term, crn))
+        corequisites_task = tg.create_task(get_class_corequisites(session, term, crn))
+        crosslists_task = tg.create_task(get_class_crosslists(session, term, crn))
 
-        # Initialize empty course entry
-        course_data[course_code] = {
-            "course_name": class_entry["courseTitle"],
-            "course_detail": {
-                "description": "",
-                "corequisite": [],
-                "prerequisite": [],
-                "crosslist": [],
-                "attributes": [],
-                "restrictions": [],
-                "credits": {
-                    "min": float("inf"),
-                    "max": 0,
-                },
-                "sections": [],
-            },
-        }
+    # Wait for tasks to complete and get results
+    description_data = description_task.result()
+    attributes_data = attributes_task.result()
+    restrictions_data = restrictions_task.result()
+    prerequisites_data = prerequisites_task.result()
+    corequisites_data = corequisites_task.result()
+    crosslists_data = crosslists_task.result()
 
-        async with asyncio.TaskGroup() as tg:
-            description_task = tg.create_task(get_class_description(session, term, crn))
-            attributes_task = tg.create_task(get_class_attributes(session, term, crn))
-            restrictions_task = tg.create_task(
-                get_class_restrictions(session, term, crn)
-            )
-            prerequisites_task = tg.create_task(
-                get_class_prerequisites(session, term, crn)
-            )
-            corequisites_task = tg.create_task(
-                get_class_corequisites(session, term, crn)
-            )
-            crosslists_task = tg.create_task(get_class_crosslists(session, term, crn))
+    # Fill class entry with fetched details
+    class_entry["description"] = description_data
+    class_entry["attributes"] = attributes_data
+    class_entry["restrictions"] = restrictions_data
+    class_entry["prerequisites"] = prerequisites_data
+    class_entry["corequisites"] = corequisites_data
+    class_entry["crosslists"] = crosslists_data
 
-        # Wait for tasks to complete and get results
-        description_data = description_task.result()
-        attributes_data = attributes_task.result()
-        restrictions_data = restrictions_task.result()
-        prerequisites_data = prerequisites_task.result()
-        # TODO: Filter out self-references from prerequisites
-        corequisites_data = corequisites_task.result()
-        corequisites_data = list(
-            filter(
-                lambda data: data.split()[-1] != class_entry["courseNumber"]
-                or " ".join(data.split()[:-1]) != class_entry["subjectDescription"],
-                corequisites_data,
-            )
-        )
-        crosslists_data = crosslists_task.result()
-        crosslists_data = list(
-            filter(
-                lambda data: data.split()[-1] != class_entry["courseNumber"]
-                or " ".join(data.split()[:-1]) != class_entry["subjectDescription"],
-                crosslists_data,
-            )
-        )
-
-        # Build attribute code to name map
-        # Attributes are known to be in the format "Attribute Name  CODE"
-        # Note the double space between name and code
-        if attribute_code_name_map is not None:
-            for attribute in attributes_data:
-                attribute_split = attribute.split()
-                if len(attribute_split) < 2:
-                    logger.warning(
-                        f"Skipping unexpected attribute format for CRN {crn} "
-                        f"in term {term}: {attribute}"
-                    )
-                    continue
-                attribute_code = attribute_split[-1].strip()
-                attribute_name = " ".join(attribute_split[:-1]).strip()
-                if (
-                    attribute_code in attribute_code_name_map
-                    and attribute_code_name_map[attribute_code] != attribute_name
-                ):
-                    logger.warning(
-                        f"Conflicting attribute names for {attribute_code} "
-                        f"in term {term}: "
-                        f"{attribute_code_name_map[attribute_code]} vs. {attribute_name}"
-                    )
-                attribute_code_name_map[attribute_code] = attribute_name
-
-        # Build restriction code to name map
-        # Restrictions are known to be in the format "Restriction Name (CODE)" except
-        # for special approvals, which are handled explicitly as a special case.
-        if restriction_code_name_map is not None:
-            restriction_pattern = r"(.*)\((.*)\)"
-            for restriction_type in restrictions_data:
-                restriction_type = restriction_type.lower().replace("not_", "")
-                if restriction_type not in restriction_code_name_map:
-                    restriction_code_name_map[restriction_type] = {}
-                for restriction in restrictions_data[restriction_type]:
-                    restriction_match = re.match(restriction_pattern, restriction)
-                    if restriction_match is None or len(restriction_match.groups()) < 2:
-                        # Skip unexpected restriction formats or special approvals
-                        continue
-                    restriction_name = restriction_match.group(1).strip()
-                    restriction_code = restriction_match.group(2).strip()
-                    if (
-                        restriction_name in restriction_code_name_map[restriction_type]
-                        and restriction_code_name_map[restriction_type][
-                            restriction_code
-                        ]
-                        != restriction_name
-                    ):
-                        logger.warning(
-                            f"Conflicting restriction names for {restriction_code} "
-                            f"in term {term}: "
-                            f"{restriction_code_name_map[
-                                restriction_type
-                            ][restriction_code]} vs. {restriction_name}"
-                        )
-                    restriction_code_name_map[restriction_type][
-                        restriction_code
-                    ] = restriction_name
-
-        # Initialize course entry with details
-        course_details = course_data[course_code]["course_detail"]
-        course_details["description"] = description_data
-        course_details["attributes"] = attributes_data
-        course_details["restrictions"] = restrictions_data
-        course_details["prerequisite"] = prerequisites_data
-        course_details["corequisite"] = list(set(corequisites_data))
-        course_details["crosslist"] = list(set(crosslists_data))
-
-    course_details = course_data[course_code]["course_detail"]
-
-    course_credits = course_details["credits"]
-    course_credits["min"] = min(
-        course_credits["min"], class_entry["creditHourLow"] or 0
-    )
-    course_credits["max"] = max(
-        course_credits["max"],
-        class_entry["creditHourLow"] or 0,
-        class_entry["creditHourHigh"] or 0,
-    )
-
-    course_sections = course_details["sections"]
+    # Process instructor RCSIDs and names
     class_faculty = class_entry["faculty"]
-    class_faculty_rcsids = []
-    for instructor in class_faculty:
+    for instructor in sis_class_entry["faculty"]:
         instructor_name = instructor["displayName"]
-        rcsid = "Unknown RCSID"
-        if "emailAddress" in instructor:
-            email_address = instructor["emailAddress"]
-            if email_address is not None and email_address.endswith("@rpi.edu"):
-                rcsid = email_address.split("@")[0].lower()
-                # Add to known RCSID set if provided
-                if instructor_rcsid_name_map is not None:
-                    instructor_rcsid_name_map[rcsid] = instructor["displayName"]
-        else:
+        email_address = instructor["emailAddress"]
+        # Add faculty entry to class faculty list
+        class_faculty.append(
+            {
+                "bannerId": instructor["bannerId"],
+                "displayName": instructor_name,
+                "emailAddress": email_address,
+                "primaryFaculty": instructor["primaryIndicator"],
+            }
+        )
+        if "emailAddress" not in instructor:
             logger.warning(
                 f"Missing instructor email address field for CRN {crn} "
                 f"in term {term}: {instructor_name}"
             )
-        class_faculty_rcsids.append(f"{instructor_name} ({rcsid})")
+            continue
+        # Add faculty RCSID to known RCSID map if provided
+        if (
+            email_address is not None
+            and email_address.endswith("@rpi.edu")
+            and instructor_rcsid_name_map is not None
+        ):
+            rcsid = email_address.split("@")[0].lower()
+            instructor_rcsid_name_map[rcsid] = instructor_name
 
-    course_sections.append(
-        {
-            "CRN": class_entry["courseReferenceNumber"],
-            "instructor": class_faculty_rcsids,
-            "capacity": class_entry["maximumEnrollment"],
-            "registered": class_entry["enrollment"],
-            "open": class_entry["seatsAvailable"],
-        }
-    )
+    # Append class entry to course data
+    course_data[course_num].append(class_entry)
+
+    # Add to attribute code-to-name map
+    # Attributes are known to be in the format "Attribute Name  CODE"
+    # Note the double space between name and code
+    if attribute_code_name_map is not None:
+        for attribute in attributes_data:
+            attribute_split = attribute.split()
+            if len(attribute_split) < 2:
+                logger.warning(
+                    f"Skipping unexpected attribute format for CRN {crn} "
+                    f"in term {term}: {attribute}"
+                )
+                continue
+            attribute_code = attribute_split[-1].strip()
+            attribute_name = " ".join(attribute_split[:-1]).strip()
+            if (
+                attribute_code in attribute_code_name_map
+                and attribute_code_name_map[attribute_code] != attribute_name
+            ):
+                logger.warning(
+                    f"Conflicting attribute names for {attribute_code} "
+                    f"in term {term}: "
+                    f"{attribute_code_name_map[attribute_code]} vs. {attribute_name}"
+                )
+            attribute_code_name_map[attribute_code] = attribute_name
+
+    # Add to restriction code-to-name map
+    # Restrictions are known to be in the format "Restriction Name (CODE)" except
+    # for special approvals, which are handled explicitly as a special case.
+    if restriction_code_name_map is not None:
+        restriction_pattern = r"(.*)\((.*)\)"
+        for restriction_type in restrictions_data:
+            restriction_type = restriction_type.lower().replace("not_", "")
+            if restriction_type not in restriction_code_name_map:
+                restriction_code_name_map[restriction_type] = {}
+            for restriction in restrictions_data[restriction_type]:
+                restriction_match = re.match(restriction_pattern, restriction)
+                if restriction_match is None or len(restriction_match.groups()) < 2:
+                    # Skip unexpected restriction formats or special approvals
+                    continue
+                restriction_name = restriction_match.group(1).strip()
+                restriction_code = restriction_match.group(2).strip()
+                if (
+                    restriction_name in restriction_code_name_map[restriction_type]
+                    and restriction_code_name_map[restriction_type][restriction_code]
+                    != restriction_name
+                ):
+                    logger.warning(
+                        f"Conflicting restriction names for {restriction_code} "
+                        f"in term {term}: "
+                        f"{restriction_code_name_map[
+                            restriction_type
+                        ][restriction_code]} vs. {restriction_name}"
+                    )
+                restriction_code_name_map[restriction_type][
+                    restriction_code
+                ] = restriction_name
 
 
-async def get_course_data(
+async def get_subj_course_data(
     term: str,
     subject: str,
     instructor_rcsid_name_map: dict[str, str] = None,
@@ -266,13 +234,6 @@ async def get_course_data(
 
     This function spawns its own client session to avoid session state conflicts with
     other subjects that may be processing concurrently.
-
-    In the context of this scraper, a "class" refers to a section of a course, while a
-    "course" refers to the overarching course that may have multiple classes.
-
-    The data returned from SIS is keyed by classes, not courses. This function
-    manipulates and aggregates this data such that the returned structure is keyed by
-    courses instead, with classes as a sub-field of each course.
 
     @param term: Term code to fetch data for.
     @param subject: Subject code to fetch data for.
@@ -303,21 +264,26 @@ async def get_course_data(
                 # Reset search state on server before fetching class data
                 await reset_class_search(session, term)
                 class_data = await class_search(session, term, subject)
-                course_data = {}
+                subj_class_data = {}
                 async with asyncio.TaskGroup() as tg:
                     for class_entry in class_data:
                         tg.create_task(
                             process_class_details(
                                 session,
-                                course_data,
+                                subj_class_data,
                                 class_entry,
                                 instructor_rcsid_name_map=instructor_rcsid_name_map,
                                 restriction_code_name_map=restriction_code_name_map,
                                 attribute_code_name_map=attribute_code_name_map,
                             )
                         )
+                # Sort class entries by section number
+                for course_num in subj_class_data:
+                    subj_class_data[course_num] = sorted(
+                        subj_class_data[course_num], key=lambda x: x["sectionNumber"]
+                    )
                 # Return data sorted by course code
-                return dict(sorted(course_data.items()))
+                return dict(sorted(subj_class_data.items()))
             except aiohttp.ClientError as e:
                 logger.error(f"Error processing subject {subject} in term {term}: {e}")
                 return {}
@@ -391,11 +357,11 @@ async def get_term_course_data(
             for subject in subjects:
                 subject_code = subject["code"]
                 term_course_data[subject_code] = {
-                    "subject_name": subject["description"],
+                    "subjectName": subject["description"],
                     "courses": {},
                 }
                 task = tg.create_task(
-                    get_course_data(
+                    get_subj_course_data(
                         term,
                         subject_code,
                         instructor_rcsid_name_map=instructor_rcsid_name_map,

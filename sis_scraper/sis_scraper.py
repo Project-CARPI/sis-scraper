@@ -375,6 +375,9 @@ async def get_term_course_data(
                 tasks.append(task)
     except Exception as e:
         logger.error(f"Error processing subjects for term {term}: {e}")
+        import traceback
+
+        traceback.print_exc()
         return False
 
     # Wait for all tasks to complete and gather results

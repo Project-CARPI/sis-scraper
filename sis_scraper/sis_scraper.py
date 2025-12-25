@@ -129,6 +129,7 @@ async def process_class_details(
             "campusDescription": sis_meeting_info["campusDescription"],
             "buildingCode": sis_meeting_info["building"],
             "buildingDescription": sis_meeting_info["buildingDescription"],
+            "category": sis_meeting_info["category"],
             "room": sis_meeting_info["room"],
             "startDate": sis_meeting_info["startDate"],
             "endDate": sis_meeting_info["endDate"],

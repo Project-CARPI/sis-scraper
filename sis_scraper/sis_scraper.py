@@ -102,6 +102,9 @@ async def process_class_details(
         "seatsCapacity": sis_class_entry["maximumEnrollment"],
         "seatsRegistered": sis_class_entry["enrollment"],
         "seatsAvailable": sis_class_entry["seatsAvailable"],
+        "waitlistCapacity": sis_class_entry["waitCapacity"],
+        "waitlistRegistered": sis_class_entry["waitCount"],
+        "waitlistAvailable": sis_class_entry["waitAvailable"],
         "faculty": [],
         "meetingInfo": [],
     }

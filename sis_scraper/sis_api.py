@@ -309,7 +309,7 @@ async def get_class_details(
         credit_min, credit_max = credit_hours_tag.text.strip().split(" TO ")
     else:
         credit_hours_tag = details_tag.find("span", text="Credit Hours:")
-        credit_min = credit_hours_tag.find_next_sibling("span").text.strip()
+        credit_min = credit_hours_tag.next_sibling.text.strip()
     return {
         "courseReferenceNumber": crn,
         "subjectName": subj_name,

@@ -498,10 +498,12 @@ async def get_term_course_data(
     term_course_data_by_code = {}
     for subject_desc, data in term_course_data.items():
         subject_code = data["subjectCode"]
-        term_course_data_by_code[subject_code] = data
-        # Replace subject code field with subject description
+        term_course_data_by_code[subject_code] = {
+            "subjectDescription": subject_desc,
+            **data,
+        }
+        # Remove redundant subject code entry
         del term_course_data_by_code[subject_code]["subjectCode"]
-        term_course_data_by_code[subject_code]["subjectDescription"] = subject_desc
     term_course_data = term_course_data_by_code
 
     # Write all term data to JSON file

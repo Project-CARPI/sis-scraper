@@ -272,6 +272,55 @@ async def class_search(
     return course_data
 
 
+async def get_class_details(
+    session: aiohttp.ClientSession, term: str, crn: str
+) -> dict[str, Any]:
+    """
+    Fetches and parses data from the "Details" tab of a class details page.
+
+    Returned data format is as follows:
+    ```
+    {
+        "courseReferenceNumber": "12345",
+        "subjectName": "Computer Science",
+        "courseNumber": "1100",
+        "title": "COMPUTER SCIENCE I",
+        "sectionNumber": "01",
+        "creditMin": 4,
+        "creditMax": None
+    }
+    ```
+    """
+    url = _BASE_URL + "searchResults/getClassDetails"
+    params = {"term": term, "courseReferenceNumber": crn}
+    raw_data = await retry_get(session, url, params)
+    raw_data = html_unescape(raw_data)
+    soup = bs4.BeautifulSoup(raw_data, "html5lib")
+    details_tag = soup.find("section", {"aria-labelledby": "classDetails"})
+    crn = details_tag.find("span", {"id": "courseReferenceNumber"}).text.strip()
+    section_num = details_tag.find("span", {"id": "sectionNumber"}).text.strip()
+    subj_name = details_tag.find("span", {"id": "subject"}).text.strip()
+    course_num = details_tag.find("span", {"id": "courseDisplay"}).text.strip()
+    title = details_tag.find("span", {"id": "courseTitle"}).text.strip()
+    # Only courses with a credit range have a span with id "credit-hours-discretion",
+    # otherwise the credit hours span follows a span with text "Credit Hours:".
+    credit_min, credit_max = None, None
+    if credit_hours_tag := details_tag.find("span", {"id": "credit-hours-discretion"}):
+        credit_min, credit_max = credit_hours_tag.text.strip().split(" TO ")
+    else:
+        credit_hours_tag = details_tag.find("span", text="Credit Hours:")
+        credit_min = credit_hours_tag.find_next_sibling("span").text.strip()
+    return {
+        "courseReferenceNumber": crn,
+        "subjectName": subj_name,
+        "courseNumber": course_num,
+        "title": title,
+        "sectionNumber": section_num,
+        "creditMin": int(credit_min) if credit_min is not None else None,
+        "creditMax": int(credit_max) if credit_max is not None else None,
+    }
+
+
 async def get_class_description(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> str:

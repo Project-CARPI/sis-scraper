@@ -586,7 +586,7 @@ async def get_class_crosslists(
     session: aiohttp.ClientSession,
     term: str,
     crn: str,
-):
+) -> list[dict[str, Any]]:
     """
     Fetches and parses data from the "Cross Listed" tab of a class details
     page.

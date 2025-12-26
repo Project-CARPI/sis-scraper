@@ -464,7 +464,7 @@ async def main(
     """
 
     if output_data_dir is None:
-        logger.error("No data output directory specified")
+        logger.fatal("No data output directory specified")
         return False
 
     # Convert paths to Path objects if given as strings
@@ -544,7 +544,7 @@ async def main(
                 f"at {subject_code_name_map_path}"
             )
     except Exception as e:
-        logger.error(f"Error loading code mapping files: {e}")
+        logger.fatal(f"Error loading code mapping files: {e}")
         import traceback
 
         traceback.print_exc()
@@ -592,7 +592,7 @@ async def main(
                 num_terms_processed += 1
 
     except Exception as e:
-        logger.error(f"Error in SIS scraper: {e}")
+        logger.fatal(f"Error in SIS scraper: {e}")
         import traceback
 
         traceback.print_exc()

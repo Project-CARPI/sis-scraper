@@ -390,7 +390,9 @@ async def get_term_course_data(
     """
     timeout_obj = aiohttp.ClientTimeout(total=timeout)
     try:
-        async with aiohttp.ClientSession(timeout=timeout_obj) as session:
+        async with aiohttp.ClientSession(
+            connector=tcp_connector, timeout=timeout_obj
+        ) as session:
             subjects = await get_term_subjects(session, term)
     except aiohttp.ClientError as e:
         logger.error(f"Error fetching subjects for term {term}: {e}")
@@ -446,10 +448,12 @@ async def get_term_course_data(
                 )
                 tasks.append(task)
     except Exception as e:
-        logger.error(f"Error processing subjects for term {term}: {e}")
         import traceback
 
-        traceback.print_exc()
+        logger.error(
+            f"Error processing subjects for term {term}: {e}"
+            f"\n{traceback.format_exc()}"
+        )
         return False
 
     # Wait for all tasks to complete and gather results
@@ -650,10 +654,11 @@ async def main(
                 f"at {subject_code_name_map_path}"
             )
     except Exception as e:
-        logger.fatal(f"Error loading code mapping files: {e}")
         import traceback
 
-        traceback.print_exc()
+        logger.fatal(
+            f"Error loading code mapping files: {e}" f"\n{traceback.format_exc()}"
+        )
         return False
 
     # Limit concurrent client sessions and simultaneous connections
@@ -702,10 +707,9 @@ async def main(
                     num_terms_processed += 1
 
     except Exception as e:
-        logger.fatal(f"Error in SIS scraper: {e}")
         import traceback
 
-        traceback.print_exc()
+        logger.fatal(f"Error in SIS scraper: {e}\n{traceback.format_exc()}")
         return False
 
     # Write code maps to JSON files if code mapping paths are provided
@@ -750,10 +754,9 @@ async def main(
             with subject_code_name_map_path.open("w", encoding="utf-8") as f:
                 json.dump(subject_code_name_map, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        logger.error(f"Error writing code mapping files: {e}")
         import traceback
 
-        traceback.print_exc()
+        logger.error(f"Error writing code mapping files: {e}\n{traceback.format_exc()}")
         return False
 
     end_time = time.time()

@@ -312,7 +312,7 @@ async def get_subj_course_data(
         timeout_obj = aiohttp.ClientTimeout(total=timeout)
 
         async with aiohttp.ClientSession(
-            connector=tcp_connector, timeout=timeout_obj
+            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
         ) as session:
             try:
                 # Reset search state on server before fetching class data
@@ -391,7 +391,7 @@ async def get_term_course_data(
     timeout_obj = aiohttp.ClientTimeout(total=timeout)
     try:
         async with aiohttp.ClientSession(
-            connector=tcp_connector, timeout=timeout_obj
+            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
         ) as session:
             subjects = await get_term_subjects(session, term)
     except aiohttp.ClientError as e:
@@ -468,7 +468,7 @@ async def get_term_course_data(
     # the main class search and fetch their details.
     async with semaphore:
         async with aiohttp.ClientSession(
-            connector=tcp_connector, timeout=timeout_obj
+            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
         ) as session:
             hidden_crns = {
                 crosslist["courseReferenceNumber"]

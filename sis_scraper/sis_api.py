@@ -69,7 +69,12 @@ def html_unescape(obj: Any) -> Any:
     wait=wait_random_exponential(multiplier=1.5) + wait_random(min=0, max=2),
     retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)),
     before_sleep=lambda retry_state: logger.warning(
-        f"Retrying failed request (attempt {retry_state.attempt_number})"
+        f"Retrying failed request (attempt {retry_state.attempt_number}) "
+        f"for URL: {getattr(retry_state.args[1], 'url', retry_state.args[1])} "
+        f"with params: {retry_state.args[2]} | "
+        f"Exception: {retry_state.outcome.exception()}"
+        if retry_state.outcome and retry_state.outcome.exception()
+        else "Unknown"
     ),
 )
 async def retry_get(

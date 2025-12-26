@@ -349,6 +349,57 @@ async def get_class_description(
             return text
 
 
+async def get_class_enrollment(
+    session: aiohttp.ClientSession, term: str, crn: str
+) -> dict[str, Any]:
+    """
+    Fetches and parses data from the "Enrollment/Waitlist" tab of a class details page.
+
+    Returned data format is as follows:
+    ```
+    {
+        "enrollmentActual": 28,
+        "enrollmentMaximum": 30,
+        "enrollmentSeatsAvailable": 2,
+        "waitlistActual": 0,
+        "waitlistMaximum": 10,
+        "waitlistSeatsAvailable": 10
+    }
+    ```
+    """
+    url = _BASE_URL + "searchResults/getEnrollmentInfo"
+    params = {"term": term, "courseReferenceNumber": crn}
+    raw_data = await retry_get(session, url, params)
+    raw_data = html_unescape(raw_data)
+    soup = bs4.BeautifulSoup(raw_data, "html5lib")
+    enrollment_tag = soup.find("section", {"aria-labelledby": "enrollmentInfo"})
+    # There are no relevant classes or ids on the spans, so we have to rely on the text
+    # content of the preceding <span> tags.
+    enrollment_data = {}
+    span_tags = enrollment_tag.find_all("span")
+    # Dynamically create dictionary keys based on span text
+    for span_tag in span_tags:
+        span_text = span_tag.text.strip()
+        # Skip numeric span texts
+        if span_text.isdigit():
+            continue
+        words = span_text.split()
+        # Skip empty span texts
+        if not words:
+            continue
+        first_word = words[0]
+        # Lowercase the entire first word if it's all uppercase, otherwise just lowercase
+        # the first character.
+        if first_word.isupper():
+            first_word = first_word.lower()
+        else:
+            first_word = first_word[0].lower() + first_word[1:]
+        # Construct the dictionary key
+        dict_key = first_word + "".join(word for word in words[1:])
+        enrollment_data[dict_key] = int(span_tag.find_next_sibling("span").text.strip())
+    return enrollment_data
+
+
 async def get_class_attributes(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> list[str]:

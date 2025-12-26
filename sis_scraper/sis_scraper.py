@@ -17,6 +17,7 @@ from sis_api import (
     get_class_prerequisites,
     get_class_restrictions,
     get_term_subjects,
+    _process_class_meetings,
     reset_class_search,
 )
 
@@ -80,7 +81,7 @@ async def process_class_details(
     course_num = sis_class_entry["courseNumber"]
     term = sis_class_entry["term"]
     crn = sis_class_entry["courseReferenceNumber"]
-    meetings_list = sis_class_entry["meetingsFaculty"]
+    sis_meetings_list = sis_class_entry["meetingsFaculty"]
 
     # Initialize course entry if not already present
     if course_num not in course_data:
@@ -106,39 +107,8 @@ async def process_class_details(
         "waitlistRegistered": sis_class_entry["waitCount"],
         "waitlistAvailable": sis_class_entry["waitAvailable"],
         "faculty": [],
-        "meetingInfo": [],
+        "meetingInfo": _process_class_meetings(sis_meetings_list),
     }
-
-    day_codes = {
-        "sunday": "U",
-        "monday": "M",
-        "tuesday": "T",
-        "wednesday": "W",
-        "thursday": "R",
-        "friday": "F",
-        "saturday": "S",
-    }
-    # Process meeting information
-    for meeting in meetings_list:
-        sis_meeting_info = meeting["meetingTime"]
-        meeting_info = {
-            "beginTime": sis_meeting_info["beginTime"],
-            "endTime": sis_meeting_info["endTime"],
-            "creditHours": sis_meeting_info["creditHourSession"],
-            "campusCode": sis_meeting_info["campus"],
-            "campusDescription": sis_meeting_info["campusDescription"],
-            "buildingCode": sis_meeting_info["building"],
-            "buildingDescription": sis_meeting_info["buildingDescription"],
-            "category": sis_meeting_info["category"],
-            "room": sis_meeting_info["room"],
-            "startDate": sis_meeting_info["startDate"],
-            "endDate": sis_meeting_info["endDate"],
-            "days": [],
-        }
-        for day in day_codes:
-            if sis_meeting_info[day]:
-                meeting_info["days"].append(day_codes[day])
-        class_entry["meetingInfo"].append(meeting_info)
 
     # Fetch class details not included in main class details
     async with asyncio.TaskGroup() as tg:

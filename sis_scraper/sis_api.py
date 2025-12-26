@@ -645,3 +645,61 @@ async def get_class_crosslists(
             }
         )
     return crosslists
+
+
+def _process_class_meetings(
+    sis_meetings_list: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Processes raw class meeting data from SIS into a more usable format.
+
+    Returned data format is as follows:
+    [
+        {
+            "beginTime": "0800",
+            "endTime": "0950",
+            "creditHours": 4,
+            "campusCode": "T",
+            "campusDescription": "Troy",
+            "buildingCode": "SAGE",
+            "buildingDescription": "Russell Sage Laboratory",
+            "category": "L",
+            "room": "303",
+            "startDate": "01/15/2024",
+            "endDate": "05/01/2024",
+            "days": ["M", "W", "F"]
+        },
+        ...
+    ]
+    """
+    meetings_list = []
+    day_codes = {
+        "sunday": "U",
+        "monday": "M",
+        "tuesday": "T",
+        "wednesday": "W",
+        "thursday": "R",
+        "friday": "F",
+        "saturday": "S",
+    }
+    for meeting in sis_meetings_list:
+        sis_meeting_info = meeting["meetingTime"]
+        meeting_info = {
+            "beginTime": sis_meeting_info["beginTime"],
+            "endTime": sis_meeting_info["endTime"],
+            "creditHours": sis_meeting_info["creditHourSession"],
+            "campusCode": sis_meeting_info["campus"],
+            "campusDescription": sis_meeting_info["campusDescription"],
+            "buildingCode": sis_meeting_info["building"],
+            "buildingDescription": sis_meeting_info["buildingDescription"],
+            "category": sis_meeting_info["category"],
+            "room": sis_meeting_info["room"],
+            "startDate": sis_meeting_info["startDate"],
+            "endDate": sis_meeting_info["endDate"],
+            "days": [],
+        }
+        for day in day_codes:
+            if sis_meeting_info[day]:
+                meeting_info["days"].append(day_codes[day])
+        meetings_list.append(meeting_info)
+    return meetings_list

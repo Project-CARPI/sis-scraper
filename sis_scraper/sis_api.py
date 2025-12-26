@@ -741,7 +741,7 @@ async def get_class_crosslists(
     return crosslists
 
 
-async def get_class_meetings(
+async def get_class_faculty_meetings(
     session: aiohttp.ClientSession,
     term: str,
     crn: str,
@@ -751,59 +751,63 @@ async def get_class_meetings(
     page.
 
     Returned data format is as follows:
+    ```
     [
-        {
-            "beginTime": "0800",
-            "endTime": "0950",
-            "creditHours": 4,
-            "campusCode": "T",
-            "campusDescription": "Troy",
-            "buildingCode": "SAGE",
-            "buildingDescription": "Russell Sage Laboratory",
-            "category": "L",
-            "room": "303",
-            "startDate": "01/15/2024",
-            "endDate": "05/01/2024",
-            "days": ["M", "W", "F"]
-        },
+        "faculty": [
+            {
+                "bannerId": "123456",
+                "displayName": "Last, First",
+                "emailAddress": "example@rpi.edu",
+                "allMeetings": [1, 2, ...],
+                "primaryMeetings": [1, ...]
+            },
+            ...
+        ],
+        "meetings": [
+            {
+                "id": 1,
+                "beginTime": "0800",
+                "endTime": "0950",
+                "creditHours": 4,
+                "campusCode": "T",
+                "campusDescription": "Troy",
+                "buildingCode": "SAGE",
+                "buildingDescription": "Russell Sage Laboratory",
+                "category": "L",
+                "room": "303",
+                "startDate": "01/15/2024",
+                "endDate": "05/01/2024",
+                "days": ["M", "W", "F"]
+            },
+            ...
+        ]
         ...
     ]
+    ```
     """
     url = _BASE_URL + "searchResults/getFacultyMeetingTimes"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     json_data = json.loads(raw_data)
     json_data = html_unescape(json_data)
-    sis_meetings_list = json_data["fmt"]
-    meetings_list = _process_class_meetings(sis_meetings_list)
+    sis_faculty_meetings_list = json_data["fmt"]
+    meetings_list = _process_class_faculty_meetings(
+        sis_faculty_meetings_list, term, crn
+    )
     return meetings_list
 
 
-def _process_class_meetings(
-    sis_meetings_list: list[dict[str, Any]],
+def _process_class_faculty_meetings(
+    sis_faculty_meetings_list: list[dict[str, Any]],
+    term: str,
+    crn: str,
 ) -> list[dict[str, Any]]:
     """
     Processes raw class meeting data from SIS into a more usable format.
 
-    Returned data format is as follows:
-    [
-        {
-            "beginTime": "0800",
-            "endTime": "0950",
-            "creditHours": 4,
-            "campusCode": "T",
-            "campusDescription": "Troy",
-            "buildingCode": "SAGE",
-            "buildingDescription": "Russell Sage Laboratory",
-            "category": "L",
-            "room": "303",
-            "startDate": "01/15/2024",
-            "endDate": "05/01/2024",
-            "days": ["M", "W", "F"]
-        },
-        ...
-    ]
+    See get_class_faculty_meetings() for returned data format.
     """
+    faculty_dict = {}
     meetings_list = []
     day_codes = {
         "sunday": "U",
@@ -814,24 +818,65 @@ def _process_class_meetings(
         "friday": "F",
         "saturday": "S",
     }
-    for meeting in sis_meetings_list:
-        sis_meeting_info = meeting["meetingTime"]
-        meeting_info = {
-            "beginTime": sis_meeting_info["beginTime"],
-            "endTime": sis_meeting_info["endTime"],
-            "creditHours": sis_meeting_info["creditHourSession"],
-            "campusCode": sis_meeting_info["campus"],
-            "campusDescription": sis_meeting_info["campusDescription"],
-            "buildingCode": sis_meeting_info["building"],
-            "buildingDescription": sis_meeting_info["buildingDescription"],
-            "category": sis_meeting_info["category"],
-            "room": sis_meeting_info["room"],
-            "startDate": sis_meeting_info["startDate"],
-            "endDate": sis_meeting_info["endDate"],
-            "days": [],
-        }
-        for day in day_codes:
-            if sis_meeting_info[day]:
-                meeting_info["days"].append(day_codes[day])
-        meetings_list.append(meeting_info)
-    return meetings_list
+    for i, faculty_meeting in enumerate(sis_faculty_meetings_list, start=1):
+        sis_meeting_info = faculty_meeting["meetingTime"]
+        sis_faculty_list = faculty_meeting["faculty"]
+        if sis_meeting_info is None and sis_faculty_list is None:
+            logger.warning(
+                "Found faculty-meeting entry with no meeting info or faculty list for "
+                f"CRN {crn} in term {term}"
+            )
+            continue
+        if sis_meeting_info is not None:
+            meeting_info = {
+                "id": i,
+                "beginTime": sis_meeting_info["beginTime"],
+                "endTime": sis_meeting_info["endTime"],
+                "creditHours": sis_meeting_info["creditHourSession"],
+                "campusCode": sis_meeting_info["campus"],
+                "campusDescription": sis_meeting_info["campusDescription"],
+                "buildingCode": sis_meeting_info["building"],
+                "buildingDescription": sis_meeting_info["buildingDescription"],
+                "category": sis_meeting_info["category"],
+                "room": sis_meeting_info["room"],
+                "startDate": sis_meeting_info["startDate"],
+                "endDate": sis_meeting_info["endDate"],
+                "days": [
+                    code for day, code in day_codes.items() if sis_meeting_info[day]
+                ],
+            }
+            meetings_list.append(meeting_info)
+        else:
+            logger.warning(
+                f"Found faculty-meeting entry with no meeting info for CRN {crn} "
+                f"in term {term}"
+            )
+        if sis_faculty_list is not None:
+            for faculty in sis_faculty_list:
+                banner_id = faculty["bannerId"]
+                # Initialize faculty entry if it doesn't exist
+                faculty_entry = faculty_dict.setdefault(
+                    banner_id,
+                    {
+                        "displayName": faculty["displayName"],
+                        "emailAddress": faculty["emailAddress"],
+                        "allMeetings": [],
+                        "primaryMeetings": [],
+                    },
+                )
+                if sis_meeting_info:
+                    # Add meeting ID to faculty's meeting lists
+                    faculty_entry["allMeetings"].append(i)
+                    if faculty["primaryIndicator"]:
+                        faculty_entry["primaryMeetings"].append(i)
+        else:
+            logger.warning(
+                f"Found faculty-meeting entry with no faculty list for CRN {crn} "
+                f"in term {term}"
+            )
+    # Convert faculty dictionary into a list
+    faculty_list = list(faculty_dict.values())
+    return {
+        "faculty": faculty_list,
+        "meetings": meetings_list,
+    }

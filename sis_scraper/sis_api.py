@@ -359,11 +359,11 @@ async def get_class_enrollment(
     ```
     {
         "enrollmentActual": 28,
-        "enrollmentMaximum": 30,
-        "enrollmentSeatsAvailable": 2,
+        "enrollmentCapacity": 30,
+        "enrollmentAvailable": 2,
         "waitlistActual": 0,
-        "waitlistMaximum": 10,
-        "waitlistSeatsAvailable": 10
+        "waitlistCapacity": 10,
+        "waitlistAvailable": 10
     }
     ```
     """
@@ -377,26 +377,20 @@ async def get_class_enrollment(
     # content of the preceding <span> tags.
     enrollment_data = {}
     span_tags = enrollment_tag.find_all("span")
-    # Dynamically create dictionary keys based on span text
-    for span_tag in span_tags:
-        span_text = span_tag.text.strip()
-        # Skip numeric span texts
-        if span_text.isdigit():
-            continue
-        words = span_text.split()
-        # Skip empty span texts
-        if not words:
-            continue
-        first_word = words[0]
-        # Lowercase the entire first word if it's all uppercase, otherwise just lowercase
-        # the first character.
-        if first_word.isupper():
-            first_word = first_word.lower()
-        else:
-            first_word = first_word[0].lower() + first_word[1:]
-        # Construct the dictionary key
-        dict_key = first_word + "".join(word for word in words[1:])
-        enrollment_data[dict_key] = int(span_tag.find_next_sibling("span").text.strip())
+    for i, tag in enumerate(span_tags):
+        text = tag.text.strip()
+        if text == "Enrollment Actual:":
+            enrollment_data["enrollmentActual"] = int(span_tags[i + 1].text.strip())
+        elif text == "Enrollment Maximum:":
+            enrollment_data["enrollmentCapacity"] = int(span_tags[i + 1].text.strip())
+        elif text == "Enrollment Seats Available:":
+            enrollment_data["enrollmentAvailable"] = int(span_tags[i + 1].text.strip())
+        elif text == "Waitlist Capacity:":
+            enrollment_data["waitlistCapacity"] = int(span_tags[i + 1].text.strip())
+        elif text == "Waitlist Actual:":
+            enrollment_data["waitlistActual"] = int(span_tags[i + 1].text.strip())
+        elif text == "Waitlist Seats Available:":
+            enrollment_data["waitlistAvailable"] = int(span_tags[i + 1].text.strip())
     return enrollment_data
 
 

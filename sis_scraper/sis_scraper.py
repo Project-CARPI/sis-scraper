@@ -528,8 +528,8 @@ async def main(
     instructor_rcsid_name_map_path: Path | str | None = None,
     restriction_code_name_map_path: Path | str | None = None,
     subject_code_name_map_path: Path | str | None = None,
-    semaphore_val: int = 10,
-    limit_per_host: int = 5,
+    max_concurrent_sessions: int = 10,
+    limit_per_host: int = 20,
     timeout: int = 30,
 ) -> bool:
     """
@@ -565,7 +565,7 @@ async def main(
         mapping JSON file.
     @param subject_code_name_map_path: Path to load/save subject code mapping
         JSON file.
-    @param semaphore_val: Maximum number of concurrent client sessions to
+    @param max_concurrent_sessions: Maximum number of concurrent client sessions to
         spawn.
     @param limit_per_host: Maximum number of simultaneous connections a session
         can make to the SIS server.
@@ -662,7 +662,7 @@ async def main(
         return False
 
     # Limit concurrent client sessions and simultaneous connections
-    semaphore = asyncio.Semaphore(semaphore_val)
+    semaphore = asyncio.Semaphore(max_concurrent_sessions)
 
     logger.info("Starting SIS scraper with settings:")
     logger.info(f"  Years: {start_year} - {end_year}")

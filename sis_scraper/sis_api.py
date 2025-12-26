@@ -647,6 +647,44 @@ async def get_class_crosslists(
     return crosslists
 
 
+async def get_class_meetings(
+    session: aiohttp.ClientSession,
+    term: str,
+    crn: str,
+) -> list[dict[str, Any]]:
+    """
+    Fetches and parses data from the "Instructor/Meeting Times" tab of a class details
+    page.
+
+    Returned data format is as follows:
+    [
+        {
+            "beginTime": "0800",
+            "endTime": "0950",
+            "creditHours": 4,
+            "campusCode": "T",
+            "campusDescription": "Troy",
+            "buildingCode": "SAGE",
+            "buildingDescription": "Russell Sage Laboratory",
+            "category": "L",
+            "room": "303",
+            "startDate": "01/15/2024",
+            "endDate": "05/01/2024",
+            "days": ["M", "W", "F"]
+        },
+        ...
+    ]
+    """
+    url = _BASE_URL + "searchResults/getFacultyMeetingTimes"
+    params = {"term": term, "courseReferenceNumber": crn}
+    raw_data = await retry_get(session, url, params)
+    json_data = json.loads(raw_data)
+    json_data = html_unescape(json_data)
+    sis_meetings_list = json_data["fmt"]
+    meetings_list = _process_class_meetings(sis_meetings_list)
+    return meetings_list
+
+
 def _process_class_meetings(
     sis_meetings_list: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:

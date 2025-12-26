@@ -528,8 +528,8 @@ async def main(
     instructor_rcsid_name_map_path: Path | str | None = None,
     restriction_code_name_map_path: Path | str | None = None,
     subject_code_name_map_path: Path | str | None = None,
-    max_concurrent_sessions: int = 10,
-    limit_per_host: int = 20,
+    max_concurrent_sessions: int = 25,
+    limit_per_host: int = 75,
     timeout: int = 30,
 ) -> bool:
     """
@@ -675,7 +675,10 @@ async def main(
     try:
         # Global TCP connector for all sessions
         async with aiohttp.TCPConnector(
-            ttl_dns_cache=500, limit_per_host=limit_per_host
+            ttl_dns_cache=500,
+            limit_per_host=limit_per_host,
+            keepalive_timeout=60,
+            force_close=False,
         ) as tcp_connector:
             # Process terms in parallel
             async with asyncio.TaskGroup() as tg:

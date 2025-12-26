@@ -14,10 +14,12 @@ from sis_api import (
     get_class_corequisites,
     get_class_crosslists,
     get_class_description,
+    get_class_details,
+    get_class_enrollment,
+    get_class_faculty_meetings,
     get_class_prerequisites,
     get_class_restrictions,
     get_term_subjects,
-    _process_class_meetings,
     reset_class_search,
 )
 
@@ -54,8 +56,11 @@ def get_term_code(year: str | int, season: str) -> str:
 
 async def process_class_details(
     session: aiohttp.ClientSession,
-    course_data: dict[str, Any],
-    sis_class_entry: dict[str, Any],
+    term_course_data: dict[str, Any],
+    term_crn_set: set[str],
+    sis_class_entry: dict[str, Any] | None = None,
+    term: str | None = None,
+    crn: str | None = None,
     instructor_rcsid_name_map: dict[str, str] = None,
     attribute_code_name_map: dict[str, str] = None,
     restriction_code_name_map: dict[str, dict[str, str]] = None,
@@ -67,9 +72,10 @@ async def process_class_details(
     Takes as input class data fetched from SIS's class search endpoint.
 
     @param session: aiohttp client session to use for requests.
-    @param course_data: Dictionary to populate with course data.
+    @param subj_class_data: Subject course data dictionary to populate with class entries.
     @param sis_class_entry: Class data fetched from SIS's class search
         endpoint.
+    @param term_crn_set: Set of all CRNs processed in the term.
     @param known_rcsid_set: Optional set to populate with known instructor
         RCSIDs.
     @param attribute_code_name_map: Optional map to populate with attribute
@@ -78,39 +84,50 @@ async def process_class_details(
         codes to names.
     @return: None
     """
-    course_num = sis_class_entry["courseNumber"]
-    term = sis_class_entry["term"]
-    crn = sis_class_entry["courseReferenceNumber"]
-    sis_meetings_list = sis_class_entry["meetingsFaculty"]
+    if sis_class_entry is None and (term is None or crn is None):
+        logger.error(
+            "Either sis_class_entry or both term and crn must be provided "
+            "to process_class_details"
+        )
+        return
 
-    # Initialize course entry if not already present
-    if course_num not in course_data:
-        course_data[course_num] = []
+    # Extract basic class details from SIS class entry if provided
+    if sis_class_entry is not None:
+        subject_desc = sis_class_entry["subjectDescription"]
+        course_num = sis_class_entry["courseNumber"]
+        term = sis_class_entry["term"]
+        crn = sis_class_entry["courseReferenceNumber"]
+
+    # Add CRN to term CRN set
+    if crn in term_crn_set:
+        logger.warning(f"Duplicate CRN {crn} found in term {term}")
+    else:
+        term_crn_set.add(crn)
 
     # Initialize empty class entry
     class_entry = {
-        "courseReferenceNumber": sis_class_entry["courseReferenceNumber"],
-        "sectionNumber": sis_class_entry["sequenceNumber"],
-        "title": sis_class_entry["courseTitle"],
+        "courseReferenceNumber": crn,
+        "sectionNumber": "",
+        "title": "",
         "description": "",
         "attributes": [],
         "restrictions": {},
         "prerequisites": [],
         "corequisites": [],
         "crosslists": [],
-        "creditMin": sis_class_entry["creditHourLow"],
-        "creditMax": sis_class_entry["creditHourHigh"],
-        "seatsCapacity": sis_class_entry["maximumEnrollment"],
-        "seatsRegistered": sis_class_entry["enrollment"],
-        "seatsAvailable": sis_class_entry["seatsAvailable"],
-        "waitlistCapacity": sis_class_entry["waitCapacity"],
-        "waitlistRegistered": sis_class_entry["waitCount"],
-        "waitlistAvailable": sis_class_entry["waitAvailable"],
+        "creditMin": -1,
+        "creditMax": -1,
+        "seatsCapacity": -1,
+        "seatsRegistered": -1,
+        "seatsAvailable": -1,
+        "waitlistCapacity": -1,
+        "waitlistRegistered": -1,
+        "waitlistAvailable": -1,
         "faculty": [],
-        "meetingInfo": _process_class_meetings(sis_meetings_list),
+        "meetingInfo": [],
     }
 
-    # Fetch class details not included in main class details
+    # Fetch class details not included in SIS class search
     async with asyncio.TaskGroup() as tg:
         description_task = tg.create_task(get_class_description(session, term, crn))
         attributes_task = tg.create_task(get_class_attributes(session, term, crn))
@@ -118,6 +135,13 @@ async def process_class_details(
         prerequisites_task = tg.create_task(get_class_prerequisites(session, term, crn))
         corequisites_task = tg.create_task(get_class_corequisites(session, term, crn))
         crosslists_task = tg.create_task(get_class_crosslists(session, term, crn))
+        faculty_meetings_task = tg.create_task(
+            get_class_faculty_meetings(session, term, crn)
+        )
+        # Fetch full class details if not provided from SIS class search
+        if sis_class_entry is None:
+            details_task = tg.create_task(get_class_details(session, term, crn))
+            enrollment_task = tg.create_task(get_class_enrollment(session, term, crn))
 
     # Wait for tasks to complete and get results
     description_data = description_task.result()
@@ -126,6 +150,15 @@ async def process_class_details(
     prerequisites_data = prerequisites_task.result()
     corequisites_data = corequisites_task.result()
     crosslists_data = crosslists_task.result()
+    faculty_meetings_data = faculty_meetings_task.result()
+    if sis_class_entry is None:
+        details_data = details_task.result()
+        enrollment_data = enrollment_task.result()
+
+    # Extract subject and course number from full details if SIS class entry not provided
+    if sis_class_entry is None:
+        subject_desc = details_data["subjectName"]
+        course_num = details_data["courseNumber"]
 
     # Fill class entry with fetched details
     class_entry["description"] = description_data
@@ -134,27 +167,42 @@ async def process_class_details(
     class_entry["prerequisites"] = prerequisites_data
     class_entry["corequisites"] = corequisites_data
     class_entry["crosslists"] = crosslists_data
+    class_entry["faculty"] = faculty_meetings_data["faculty"]
+    class_entry["meetingInfo"] = faculty_meetings_data["meetings"]
+    # Fill class entry with SIS class search data if provided
+    if sis_class_entry is not None:
+        class_entry["sectionNumber"] = sis_class_entry["sequenceNumber"]
+        class_entry["title"] = sis_class_entry["courseTitle"]
+        class_entry["creditMin"] = sis_class_entry["creditHourLow"]
+        class_entry["creditMax"] = sis_class_entry["creditHourHigh"]
+        class_entry["seatsCapacity"] = sis_class_entry["maximumEnrollment"]
+        class_entry["seatsRegistered"] = sis_class_entry["enrollment"]
+        class_entry["seatsAvailable"] = sis_class_entry["seatsAvailable"]
+        class_entry["waitlistCapacity"] = sis_class_entry["waitCapacity"]
+        class_entry["waitlistRegistered"] = sis_class_entry["waitCount"]
+        class_entry["waitlistAvailable"] = sis_class_entry["waitAvailable"]
+    else:
+        class_entry["sectionNumber"] = details_data["sectionNumber"]
+        class_entry["title"] = details_data["title"]
+        class_entry["creditMin"] = details_data["creditMin"]
+        class_entry["creditMax"] = details_data["creditMax"]
+        class_entry["seatsCapacity"] = enrollment_data["enrollmentCapacity"]
+        class_entry["seatsRegistered"] = enrollment_data["enrollmentActual"]
+        class_entry["seatsAvailable"] = enrollment_data["enrollmentAvailable"]
+        class_entry["waitlistCapacity"] = enrollment_data["waitlistCapacity"]
+        class_entry["waitlistRegistered"] = enrollment_data["waitlistActual"]
+        class_entry["waitlistAvailable"] = enrollment_data["waitlistAvailable"]
 
-    # Process instructor RCSIDs and names
-    class_faculty = class_entry["faculty"]
-    for instructor in sis_class_entry["faculty"]:
-        instructor_name = instructor["displayName"]
-        email_address = instructor["emailAddress"]
-        # Add faculty entry to class faculty list
-        class_faculty.append(
-            {
-                "bannerId": instructor["bannerId"],
-                "displayName": instructor_name,
-                "emailAddress": email_address,
-                "primaryFaculty": instructor["primaryIndicator"],
-            }
-        )
-        if "emailAddress" not in instructor:
-            logger.warning(
-                f"Missing instructor email address field for CRN {crn} "
-                f"in term {term}: {instructor_name}"
-            )
-            continue
+    # Get appropriate subject course data dictionary from term course data
+    subj_course_data = term_course_data[subject_desc]["courses"]
+    # Initialize course entry if not already present
+    if course_num not in subj_course_data:
+        subj_course_data[course_num] = []
+
+    # Process faculty RCSIDs and names
+    for faculty in class_entry["faculty"]:
+        faculty_name = faculty["displayName"]
+        email_address = faculty["emailAddress"]
         # Add faculty RCSID to known RCSID map if provided
         if (
             email_address is not None
@@ -162,10 +210,10 @@ async def process_class_details(
             and instructor_rcsid_name_map is not None
         ):
             rcsid = email_address.split("@")[0].lower()
-            instructor_rcsid_name_map[rcsid] = instructor_name
+            instructor_rcsid_name_map[rcsid] = faculty_name
 
-    # Append class entry to course data
-    course_data[course_num].append(class_entry)
+    # Add class entry to subject course data
+    subj_course_data[course_num].append(class_entry)
 
     # Add to attribute code-to-name map
     # Attributes are known to be in the format "Attribute Name  CODE"
@@ -227,7 +275,10 @@ async def process_class_details(
 
 async def get_subj_course_data(
     term: str,
-    subject: str,
+    subject_code: str,
+    subject_desc: str,
+    term_course_data: dict[str, dict[str, Any]],
+    term_crn_set: set[str],
     instructor_rcsid_name_map: dict[str, str] = None,
     restriction_code_name_map: dict[str, dict[str, str]] = None,
     attribute_code_name_map: dict[str, str] = None,
@@ -243,6 +294,7 @@ async def get_subj_course_data(
 
     @param term: Term code to fetch data for.
     @param subject: Subject code to fetch data for.
+    @param term_crn_set: Set of all CRNs processed in the term.
     @param instructor_rcsid_name_map: Optional map to populate with instructor
         RCSIDs to names.
     @param restriction_code_name_map: Optional map to populate with restriction
@@ -265,29 +317,40 @@ async def get_subj_course_data(
             try:
                 # Reset search state on server before fetching class data
                 await reset_class_search(session, term)
-                class_data = await class_search(session, term, subject)
-                subj_class_data = {}
+                sis_class_data = await class_search(session, term, subject_code)
+                if len(sis_class_data) == 0:
+                    logger.info(
+                        f"No classes found for subject {subject_code} in term {term}"
+                    )
+                    return {}
+                # Process class entries from the class search in parallel
                 async with asyncio.TaskGroup() as tg:
-                    for class_entry in class_data:
+                    for sis_class_entry in sis_class_data:
                         tg.create_task(
                             process_class_details(
                                 session,
-                                subj_class_data,
-                                class_entry,
+                                term_course_data,
+                                term_crn_set,
+                                sis_class_entry,
                                 instructor_rcsid_name_map=instructor_rcsid_name_map,
                                 restriction_code_name_map=restriction_code_name_map,
                                 attribute_code_name_map=attribute_code_name_map,
                             )
                         )
+                # Get subject course data from term course data
+                subj_course_data = term_course_data[subject_desc]["courses"]
                 # Sort class entries by section number
-                for course_num in subj_class_data:
-                    subj_class_data[course_num] = sorted(
-                        subj_class_data[course_num], key=lambda x: x["sectionNumber"]
+                for course_num in subj_course_data:
+                    subj_course_data[course_num] = sorted(
+                        subj_course_data[course_num],
+                        key=lambda class_entry: class_entry["sectionNumber"],
                     )
                 # Return data sorted by course code
-                return dict(sorted(subj_class_data.items()))
+                return dict(sorted(subj_course_data.items()))
             except aiohttp.ClientError as e:
-                logger.error(f"Error processing subject {subject} in term {term}: {e}")
+                logger.error(
+                    f"Error processing subject {subject_code} in term {term}: {e}"
+                )
                 return {}
 
 
@@ -352,20 +415,27 @@ async def get_term_course_data(
     # Stores all course data for the term
     term_course_data = {}
 
+    # Stores all CRNs for the term
+    term_crn_set = set()
+
     # Process subjects in parallel, each with its own session
     tasks: list[asyncio.Task] = []
     try:
         async with asyncio.TaskGroup() as tg:
             for subject in subjects:
                 subject_code = subject["code"]
-                term_course_data[subject_code] = {
-                    "subjectName": subject["description"],
+                subject_desc = subject["description"]
+                term_course_data[subject_desc] = {
+                    "subjectCode": subject_code,
                     "courses": {},
                 }
                 task = tg.create_task(
                     get_subj_course_data(
                         term,
                         subject_code,
+                        subject_desc,
+                        term_course_data,
+                        term_crn_set,
                         instructor_rcsid_name_map=instructor_rcsid_name_map,
                         restriction_code_name_map=restriction_code_name_map,
                         attribute_code_name_map=attribute_code_name_map,
@@ -385,12 +455,52 @@ async def get_term_course_data(
     # Wait for all tasks to complete and gather results
     for i, subject in enumerate(subjects):
         course_data = tasks[i].result()
-        term_course_data[subject["code"]]["courses"] = course_data
+        term_course_data[subject["description"]]["courses"] = course_data
 
     if len(term_course_data) == 0:
         return False
 
-    # Write all data for term to JSON file
+    # Check all crosslist CRNs in the term course data for any hidden classes not shown in
+    # the main class search and fetch their details.
+    async with semaphore:
+        async with aiohttp.ClientSession(
+            connector=tcp_connector, timeout=timeout_obj
+        ) as session:
+            hidden_crns = {
+                crosslist["courseReferenceNumber"]
+                for subject in term_course_data.values()
+                for course in subject["courses"].values()
+                for class_entry in course
+                for crosslist in class_entry["crosslists"]
+                if crosslist["courseReferenceNumber"] not in term_crn_set
+            }
+            if len(hidden_crns) > 0:
+                async with asyncio.TaskGroup() as tg:
+                    for crn in hidden_crns:
+                        tg.create_task(
+                            process_class_details(
+                                session,
+                                term_course_data,
+                                term_crn_set,
+                                term=term,
+                                crn=crn,
+                            )
+                        )
+                        logger.info(
+                            f"Processing hidden class with CRN {crn} in term {term}"
+                        )
+
+    # Convert term course data to be keyed by subject code instead of description
+    term_course_data_by_code = {}
+    for subject_desc, data in term_course_data.items():
+        subject_code = data["subjectCode"]
+        term_course_data_by_code[subject_code] = data
+        # Replace subject code field with subject description
+        del term_course_data_by_code[subject_code]["subjectCode"]
+        term_course_data_by_code[subject_code]["subjectDescription"] = subject_desc
+    term_course_data = term_course_data_by_code
+
+    # Write all term data to JSON file
     if isinstance(output_path, str):
         output_path = Path(output_path)
     try:
@@ -583,14 +693,13 @@ async def main(
                                 timeout=timeout,
                             )
                         )
-                    )
-                    tasks.append(task)
+                        tasks.append(task)
 
-        # Wait for all tasks to complete
-        for task in tasks:
-            success = task.result()
-            if success:
-                num_terms_processed += 1
+            # Wait for all tasks to complete
+            for task in tasks:
+                success = task.result()
+                if success:
+                    num_terms_processed += 1
 
     except Exception as e:
         logger.fatal(f"Error in SIS scraper: {e}")

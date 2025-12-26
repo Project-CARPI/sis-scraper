@@ -232,7 +232,7 @@ async def get_subj_course_data(
     restriction_code_name_map: dict[str, dict[str, str]] = None,
     attribute_code_name_map: dict[str, str] = None,
     semaphore: asyncio.Semaphore = asyncio.Semaphore(1),
-    limit_per_host: int = 5,
+    tcp_connector: aiohttp.TCPConnector = None,
     timeout: int = 30,
 ) -> dict[str, dict[str, Any]]:
     """
@@ -257,14 +257,10 @@ async def get_subj_course_data(
     @return: Dictionary of course data keyed by course code.
     """
     async with semaphore:
-        # Limit simultaneous connections to SIS server per session
-        connector = aiohttp.TCPConnector(
-            ttl_dns_cache=500, limit_per_host=limit_per_host
-        )
         timeout_obj = aiohttp.ClientTimeout(total=timeout)
 
         async with aiohttp.ClientSession(
-            connector=connector, timeout=timeout_obj
+            connector=tcp_connector, timeout=timeout_obj
         ) as session:
             try:
                 # Reset search state on server before fetching class data
@@ -303,7 +299,7 @@ async def get_term_course_data(
     restriction_code_name_map: dict[str, dict[str, str]] = None,
     attribute_code_name_map: dict[str, str] = None,
     semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
-    limit_per_host: int = 5,
+    tcp_connector: aiohttp.TCPConnector = None,
     timeout: int = 30,
 ) -> None:
     """
@@ -374,7 +370,7 @@ async def get_term_course_data(
                         restriction_code_name_map=restriction_code_name_map,
                         attribute_code_name_map=attribute_code_name_map,
                         semaphore=semaphore,
-                        limit_per_host=limit_per_host,
+                        tcp_connector=tcp_connector,
                         timeout=timeout,
                     )
                 )
@@ -562,25 +558,30 @@ async def main(
     tasks: list[asyncio.Task] = []
     num_terms_processed = 0
     try:
-        # Process terms in parallel
-        async with asyncio.TaskGroup() as tg:
-            for year in range(start_year, end_year + 1):
-                for season in seasons:
-                    term = get_term_code(year, season)
-                    if term == "":
-                        continue
-                    output_path = Path(output_data_dir) / f"{term}.json"
-                    task = tg.create_task(
-                        get_term_course_data(
-                            term,
-                            output_path=output_path,
-                            subject_code_name_map=subject_code_name_map,
-                            instructor_rcsid_name_map=instructor_rcsid_name_map,
-                            restriction_code_name_map=restriction_code_name_map,
-                            attribute_code_name_map=attribute_code_name_map,
-                            semaphore=semaphore,
-                            limit_per_host=limit_per_host,
-                            timeout=timeout,
+        # Global TCP connector for all sessions
+        async with aiohttp.TCPConnector(
+            ttl_dns_cache=500, limit_per_host=limit_per_host
+        ) as tcp_connector:
+            # Process terms in parallel
+            async with asyncio.TaskGroup() as tg:
+                for year in range(start_year, end_year + 1):
+                    for season in seasons:
+                        term = get_term_code(year, season)
+                        if term == "":
+                            continue
+                        output_path = Path(output_data_dir) / f"{term}.json"
+                        task = tg.create_task(
+                            get_term_course_data(
+                                term,
+                                output_path=output_path,
+                                subject_code_name_map=subject_code_name_map,
+                                instructor_rcsid_name_map=instructor_rcsid_name_map,
+                                restriction_code_name_map=restriction_code_name_map,
+                                attribute_code_name_map=attribute_code_name_map,
+                                semaphore=semaphore,
+                                tcp_connector=tcp_connector,
+                                timeout=timeout,
+                            )
                         )
                     )
                     tasks.append(task)

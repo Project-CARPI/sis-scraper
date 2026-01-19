@@ -114,6 +114,8 @@ class CodeMapper:
             )
         # Update RCSID to name mapping regardless of whether a conflict exists
         self.instructors[rcsid] = name
+        # Update reverse mapping
+        self.instructor_name_to_rcsid[name] = rcsid
 
     def get_subject_code(self, name: str) -> str | None:
         if name in self.subject_name_to_code:
@@ -124,10 +126,11 @@ class CodeMapper:
         # Check if name already maps to an RCSID (reverse lookup)
         if name in self.instructor_name_to_rcsid:
             return self.instructor_name_to_rcsid[name]
-        # Otherwise, generate a new RCSID
+        # Otherwise generate a new RCSID
         return self._generate_rcsid(name)
 
     def _generate_rcsid(self, instructor_name: str) -> str:
+        # Match "Last, First"
         instructor_name_pattern = r"(.+), (.+)"
         match = re.match(instructor_name_pattern, instructor_name)
         if match is None or len(match.groups()) != 2:
@@ -154,9 +157,6 @@ class CodeMapper:
         counter = 1
         original_rcsid = rcsid
         while rcsid in self.instructors:
-            # If the name matches, we can reuse this RCSID (handled in get_or_generate_rcsid)
-            # But here we are generating a NEW one because we didn't find the name.
-            # So we must ensure uniqueness.
             rcsid = f"{original_rcsid}{counter}"
             counter += 1
         return rcsid
@@ -169,6 +169,9 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper):
             mapper.add_subject(subject_code, subject_data["subjectDescription"])
 
         if "courses" not in subject_data:
+            logger.warning(
+                f"No courses found for subject {subject_code} in term {term}"
+            )
             continue
 
         for _, class_list in subject_data["courses"].items():

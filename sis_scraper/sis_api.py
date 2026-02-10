@@ -582,15 +582,54 @@ async def get_class_prerequisites(
             "Mathematics 1010"
         ]
     }
+
+    Grouping would be: CSCI 1100 and MATH 1010 and (Physics 1200 or ...) 
     ```
     """
+
+    def generate_class_info():
+        pass
+
     url = _BASE_URL + "searchResults/getSectionPrerequisites"
     params = {"term": term, "courseReferenceNumber": crn}
-    # async with session.get(url, params=params) as response:
-    #     response.raise_for_status()
-    #     text = await response.text()
-    # text = html.unescape(text)
-    # soup = bs4.BeautifulSoup(text, "html5lib")
+    raw_data = await retry_get(session, url, params)
+    raw_data = html_unescape(raw_data)
+    soup = bs4.BeautifulSoup(raw_data, "html5lib")    
+
+    text_body = soup.find_all("tbody")
+    rows = [tr for tbody in text_body for tr in tbody.find_all("tr")]
+    all_info = []
+    for prereq_info in rows:
+        headers = [td.get_text(strip=True) for td in prereq_info.find_all("td")]
+        all_info.append(headers)
+        print(headers)
+
+    def find_all_subclasses(index: int, cur_string: str) -> str:
+        if all_info[index][8] == ')':
+            return cur_string + (all_info[index][4] + " " + all_info[index][5])
+        elif all_info[index][1] == '(':
+            return find_all_subclasses(index + 1, (all_info[index][4] + " " + all_info[index][5]))
+        else:
+            cur_string += (all_info[index][4] + " " + all_info[index][5])
+            return find_all_subclasses(index + 1, cur_string)
+
+    group_string = ""
+    if len(all_info) > 0:
+        for i in range(len(all_info)):
+            cur_text = all_info[i]
+            print(cur_text)
+            if i == 0:
+                group_string += (cur_text[4] + " " + cur_text[5])
+            else:
+                if cur_text[1] == '(':
+                    print(find_all_subclasses(i, (cur_text[4] + " " + cur_text[5])))
+                else:
+                    print('hi')
+    else:
+        return ""
+
+
+
     # data = ""
     # rows = soup.find_all("tr")
     # for row in rows:

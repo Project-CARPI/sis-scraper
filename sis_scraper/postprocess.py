@@ -11,16 +11,19 @@ class CodeMapper:
     def __init__(
         self,
         attribute_path: Path | str,
+        generated_instructor_path: Path | str,
         instructor_path: Path | str,
         restriction_path: Path | str,
         subject_path: Path | str,
     ) -> None:
         self.attribute_path = Path(attribute_path)
+        self.generated_instructor_path = Path(generated_instructor_path)
         self.instructor_path = Path(instructor_path)
         self.restriction_path = Path(restriction_path)
         self.subject_path = Path(subject_path)
 
         self.attributes = self._load_json(self.attribute_path)
+        self.generated_instructors = self._load_json(self.generated_instructor_path)
         self.instructors = self._load_json(self.instructor_path)
         self.restrictions = self._load_json(self.restriction_path)
         self._normalize_restrictions()
@@ -29,8 +32,11 @@ class CodeMapper:
         # Reverse map for subject name to code lookup
         self.subject_name_to_code = {v: k for k, v in self.subjects.items()}
 
-        # Reverse map for instructor name to RCSID lookup
+        # Reverse maps for instructor name to RCSID lookup
         self.instructor_name_to_rcsid = {v: k for k, v in self.instructors.items()}
+        self.generated_instructor_name_to_rcsid = {
+            v: k for k, v in self.generated_instructors.items()
+        }
 
     def _normalize_restrictions(self) -> None:
         normalized = {}
@@ -56,6 +62,7 @@ class CodeMapper:
 
     def save(self) -> None:
         self._save_json(self.attribute_path, self.attributes)
+        self._save_json(self.generated_instructor_path, self.generated_instructors)
         self._save_json(self.instructor_path, self.instructors)
         self._save_json(self.restriction_path, self.restrictions)
         self._save_json(self.subject_path, self.subjects)
@@ -117,19 +124,33 @@ class CodeMapper:
         # Update reverse mapping
         self.instructor_name_to_rcsid[name] = rcsid
 
+    def add_generated_instructor(self, rcsid: str, name: str) -> None:
+        if (
+            rcsid in self.generated_instructors
+            and self.generated_instructors[rcsid] != name
+        ):
+            logging.warning(
+                f"Conflicting generated instructor name for RCSID {rcsid}: "
+                f"'{self.generated_instructors[rcsid]}' vs '{name}'"
+            )
+        # Update RCSID to name mapping regardless of whether a conflict exists
+        self.generated_instructors[rcsid] = name
+        # Update reverse mapping
+        self.generated_instructor_name_to_rcsid[name] = rcsid
+
     def get_subject_code(self, name: str) -> str | None:
         if name in self.subject_name_to_code:
             return self.subject_name_to_code[name]
         return None
 
-    def get_or_generate_rcsid(self, name: str) -> str:
-        # Check if name already maps to an RCSID (reverse lookup)
+    def get_rcsid(self, name: str) -> str | None:
         if name in self.instructor_name_to_rcsid:
             return self.instructor_name_to_rcsid[name]
-        # Otherwise generate a new RCSID
-        return self._generate_rcsid(name)
+        if name in self.generated_instructor_name_to_rcsid:
+            return self.generated_instructor_name_to_rcsid[name]
+        return None
 
-    def _generate_rcsid(self, instructor_name: str) -> str:
+    def generate_rcsid(self, instructor_name: str) -> str:
         # Match "Last, First"
         instructor_name_pattern = r"(.+), (.+)"
         match = re.match(instructor_name_pattern, instructor_name)
@@ -214,25 +235,30 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper):
 
                 # Faculty
                 if "faculty" in class_entry:
-                    new_faculty = []
+                    processed_faculty = []
                     for faculty in class_entry["faculty"]:
                         name = faculty["displayName"]
                         email = faculty["emailAddress"]
                         rcsid = None
+                        # Either displayName or emailAddress will be present
                         if email:
                             rcsid = email.split("@")[0]
                         if not rcsid and name:
-                            rcsid = mapper.get_or_generate_rcsid(name)
-                        if rcsid and name:
+                            rcsid = mapper.get_rcsid(name)
+                            if not rcsid:
+                                rcsid = mapper.generate_rcsid(name)
+                                mapper.add_generated_instructor(rcsid, name)
+                        elif rcsid and name:
                             mapper.add_instructor(rcsid, name)
-                        if rcsid:
-                            new_faculty.append(rcsid)
-                        elif name:
-                            new_faculty.append(name)
-                        else:
-                            new_faculty.append(str(faculty))
+                        processed_faculty.append(
+                            {
+                                "rcsid": rcsid,
+                                "allMeetings": faculty["allMeetings"],
+                                "primaryMeetings": faculty["primaryMeetings"],
+                            }
+                        )
 
-                    class_entry["faculty"] = new_faculty
+                    class_entry["faculty"] = processed_faculty
 
                 # Crosslists & Corequisites
                 for field in ["crosslists", "corequisites"]:
@@ -250,6 +276,7 @@ def main(
     output_data_dir: Path | str,
     processed_output_data_dir: Path | str,
     attribute_code_name_map_path: Path | str,
+    generated_instructor_rcsid_name_map_path: Path | str,
     instructor_rcsid_name_map_path: Path | str,
     restriction_code_name_map_path: Path | str,
     subject_code_name_map_path: Path | str,
@@ -263,6 +290,9 @@ def main(
     output_data_dir = Path(output_data_dir)
     processed_output_data_dir = Path(processed_output_data_dir)
     attribute_code_name_map_path = Path(attribute_code_name_map_path)
+    generated_instructor_rcsid_name_map_path = Path(
+        generated_instructor_rcsid_name_map_path
+    )
     instructor_rcsid_name_map_path = Path(instructor_rcsid_name_map_path)
     restriction_code_name_map_path = Path(restriction_code_name_map_path)
     subject_code_name_map_path = Path(subject_code_name_map_path)
@@ -274,6 +304,7 @@ def main(
     # Initialize code mapper
     mapper = CodeMapper(
         attribute_code_name_map_path,
+        generated_instructor_rcsid_name_map_path,
         instructor_rcsid_name_map_path,
         restriction_code_name_map_path,
         subject_code_name_map_path,
@@ -296,12 +327,17 @@ def main(
 
     # Save updated mappings
     num_attribute_codes = len(mapper.attributes)
+    num_generated_instructor_rcsids = len(mapper.generated_instructors)
     num_instructor_rcsids = len(mapper.instructors)
     num_restriction_codes = sum(len(codes) for codes in mapper.restrictions.values())
     num_subject_codes = len(mapper.subjects)
     logger.info(
         f"Saving {num_attribute_codes} attribute codes to "
         + str(attribute_code_name_map_path)
+    )
+    logger.info(
+        f"Saving {num_instructor_rcsids} generated instructor RCSIDs to "
+        + str(generated_instructor_rcsid_name_map_path)
     )
     logger.info(
         f"Saving {num_instructor_rcsids} instructor RCSIDs to "

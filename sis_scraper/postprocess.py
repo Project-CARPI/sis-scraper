@@ -172,7 +172,7 @@ class CodeMapper:
         # Ensure uniqueness against existing instructors
         counter = 1
         original_rcsid = rcsid
-        while rcsid in self.instructors:
+        while rcsid in self.instructors or rcsid in self.generated_instructors:
             rcsid = f"{original_rcsid}{counter}"
             counter += 1
         return rcsid

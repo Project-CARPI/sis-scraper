@@ -32,8 +32,7 @@ class CodeMapper:
         # Reverse map for subject name to code lookup
         self.subject_name_to_code = {v: k for k, v in self.subjects.items()}
 
-        # Reverse maps for instructor name to RCSID lookup
-        self.instructor_name_to_rcsid = {v: k for k, v in self.instructors.items()}
+        # Reverse map for instructor name to generated RCSID lookup
         self.generated_instructor_name_to_rcsid = {
             v: k for k, v in self.generated_instructors.items()
         }
@@ -121,8 +120,6 @@ class CodeMapper:
             )
         # Update RCSID to name mapping regardless of whether a conflict exists
         self.instructors[rcsid] = name
-        # Update reverse mapping
-        self.instructor_name_to_rcsid[name] = rcsid
 
     def add_generated_instructor(self, rcsid: str, name: str) -> None:
         if (
@@ -143,9 +140,7 @@ class CodeMapper:
             return self.subject_name_to_code[name]
         return None
 
-    def get_rcsid(self, name: str) -> str | None:
-        if name in self.instructor_name_to_rcsid:
-            return self.instructor_name_to_rcsid[name]
+    def get_generated_rcsid(self, name: str) -> str | None:
         if name in self.generated_instructor_name_to_rcsid:
             return self.generated_instructor_name_to_rcsid[name]
         return None
@@ -244,7 +239,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper):
                         if email:
                             rcsid = email.split("@")[0]
                         if not rcsid and name:
-                            rcsid = mapper.get_rcsid(name)
+                            rcsid = mapper.get_generated_rcsid(name)
                             if not rcsid:
                                 rcsid = mapper.generate_rcsid(name)
                                 mapper.add_generated_instructor(rcsid, name)

@@ -119,9 +119,9 @@ class CodeMapper:
         self.restrictions[r_type][code] = name.strip()
 
     def add_instructor(self, rcsid: str, name: str, email: str) -> None:
-        if rcsid in self.instructors and (self.instructors[rcsid] != (name, email)):
+        if rcsid in self.instructors and self.instructors[rcsid] != (name, email):
             logging.warning(
-                f"Conflicting instructor data for RCSID {rcsid}: "
+                f"Conflicting data for RCSID {rcsid}: "
                 f"existing name '{self.instructors[rcsid][0]}', "
                 f"email '{self.instructors[rcsid][1]}' vs. "
                 f"new name '{name}', email '{email}'; overriding old data"
@@ -134,7 +134,7 @@ class CodeMapper:
             rcsid
         ] != (name, email):
             logging.warning(
-                f"Conflicting generated instructor data for RCSID {rcsid}: "
+                f"Conflicting data for generated RCSID {rcsid}: "
                 f"existing name '{self.generated_instructors[rcsid][0]}', "
                 f"email '{self.generated_instructors[rcsid][1]}' vs. "
                 f"new name '{name}', email '{email}'; overriding old data"

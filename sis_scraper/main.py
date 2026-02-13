@@ -62,6 +62,9 @@ if __name__ == "__main__":
         attribute_code_name_map_path = code_maps_dir / os.getenv(
             "ATTRIBUTE_CODE_NAME_MAP_FILENAME"
         )
+        generated_instructor_rcsid_name_map_path = code_maps_dir / (
+            "GENERATED_" + os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
+        )
         instructor_rcsid_name_map_path = code_maps_dir / os.getenv(
             "INSTRUCTOR_RCSID_NAME_MAP_FILENAME"
         )
@@ -98,6 +101,7 @@ if __name__ == "__main__":
             output_data_dir=output_data_dir,
             processed_output_data_dir=processed_data_dir,
             attribute_code_name_map_path=attribute_code_name_map_path,
+            generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
             instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
             restriction_code_name_map_path=restriction_code_name_map_path,
             subject_code_name_map_path=subject_code_name_map_path,

@@ -63,7 +63,7 @@ if __name__ == "__main__":
             "ATTRIBUTE_CODE_NAME_MAP_FILENAME"
         )
         generated_instructor_rcsid_name_map_path = code_maps_dir / (
-            "GENERATED_" + os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
+            "generated_" + os.getenv("INSTRUCTOR_RCSID_NAME_MAP_FILENAME")
         )
         instructor_rcsid_name_map_path = code_maps_dir / os.getenv(
             "INSTRUCTOR_RCSID_NAME_MAP_FILENAME"

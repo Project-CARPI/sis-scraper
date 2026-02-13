@@ -112,26 +112,29 @@ class CodeMapper:
         # Update code to name mapping regardless of whether a conflict exists
         self.restrictions[r_type][code] = name.strip()
 
-    def add_instructor(self, rcsid: str, name: str) -> None:
-        if rcsid in self.instructors and self.instructors[rcsid] != name:
+    def add_instructor(self, rcsid: str, name: str, email: str) -> None:
+        if rcsid in self.instructors and (self.instructors[rcsid] != (name, email)):
             logging.warning(
-                f"Conflicting instructor name for RCSID {rcsid}: "
-                f"'{self.instructors[rcsid]}' vs '{name}'"
+                f"Conflicting instructor data for RCSID {rcsid}: "
+                f"existing name '{self.instructors[rcsid][0]}', "
+                f"email '{self.instructors[rcsid][1]}' vs. "
+                f"new name '{name}', email '{email}'; overriding old data"
             )
         # Update RCSID to name mapping regardless of whether a conflict exists
-        self.instructors[rcsid] = name
+        self.instructors[rcsid] = (name, email)
 
-    def add_generated_instructor(self, rcsid: str, name: str) -> None:
-        if (
-            rcsid in self.generated_instructors
-            and self.generated_instructors[rcsid] != name
-        ):
+    def add_generated_instructor(self, rcsid: str, name: str, email: str) -> None:
+        if rcsid in self.generated_instructors and self.generated_instructors[
+            rcsid
+        ] != (name, email):
             logging.warning(
-                f"Conflicting generated instructor name for RCSID {rcsid}: "
-                f"'{self.generated_instructors[rcsid]}' vs '{name}'"
+                f"Conflicting generated instructor data for RCSID {rcsid}: "
+                f"existing name '{self.generated_instructors[rcsid][0]}', "
+                f"email '{self.generated_instructors[rcsid][1]}' vs. "
+                f"new name '{name}', email '{email}'; overriding old data"
             )
         # Update RCSID to name mapping regardless of whether a conflict exists
-        self.generated_instructors[rcsid] = name
+        self.generated_instructors[rcsid] = (name, email)
         # Update reverse mapping
         self.generated_instructor_name_to_rcsid[name] = rcsid
 
@@ -239,12 +242,13 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper):
                         if email:
                             rcsid = email.split("@")[0]
                         if not rcsid and name:
+                            # Check if generated RCSID exists for this name
                             rcsid = mapper.get_generated_rcsid(name)
                             if not rcsid:
                                 rcsid = mapper.generate_rcsid(name)
-                                mapper.add_generated_instructor(rcsid, name)
+                                mapper.add_generated_instructor(rcsid, name, email)
                         elif rcsid and name:
-                            mapper.add_instructor(rcsid, name)
+                            mapper.add_instructor(rcsid, name, email)
                         processed_faculty.append(
                             {
                                 "rcsid": rcsid,

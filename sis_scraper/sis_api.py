@@ -587,13 +587,11 @@ async def get_class_prerequisites(
     Grouping would be: CSCI 1100 and MATH 1010 and (Physics 1200 or ...)
     ```
     """
-
     url = _BASE_URL + "searchResults/getSectionPrerequisites"
     params = {"term": term, "courseReferenceNumber": crn}
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
-
     text_body = soup.find_all("tbody")
     rows = [tr for tbody in text_body for tr in tbody.find_all("tr")]
     all_info = []
@@ -606,9 +604,8 @@ async def get_class_prerequisites(
     ) -> dict:
         if index == len(all_info):
             return cur_grouping
-
         cur_text = all_info[index]
-
+        course_name = cur_text[4] + " " + cur_text[5]
         if cur_text[1] == "(":
             res = find_all_subclasses(
                 id_int + 1,
@@ -617,26 +614,22 @@ async def get_class_prerequisites(
                 {
                     "id": id_int,
                     "type": all_info[type][0],
-                    "values": [cur_text[4] + " " + cur_text[5]],
+                    "values": [course_name],
                 },
             )
-
             if res:
                 cur_grouping["values"].append(res[0])
                 return find_all_subclasses(
                     id_int + 1, index + res[1], type + 1, cur_grouping
                 )
-
-        elif cur_text[8] == ")":
-            cur_grouping["values"].append(cur_text[4] + " " + cur_text[5])
-            return (cur_grouping, len(cur_grouping["values"]))
-
         else:
-            if id_int == 0:
-                cur_grouping["values"].append(cur_text[4] + " " + cur_text[5])
+            cur_grouping["values"].append(course_name)
+            if cur_text[8] == ")":
+                return (cur_grouping, len(cur_grouping["values"]))
             else:
-                cur_grouping["values"].append(cur_text[4] + " " + cur_text[5])
-            return find_all_subclasses(id_int + 1, index + 1, type + 1, cur_grouping)
+                return find_all_subclasses(
+                    id_int + 1, index + 1, type + 1, cur_grouping
+                )
 
     if len(all_info) > 0:
         # id, index, and/or, current_grouping
@@ -649,30 +642,6 @@ async def get_class_prerequisites(
         return res
     else:
         return {}
-
-    # group_string = ""
-
-    # if len(all_info) > 0:
-    #     for i in range(len(all_info)):
-    #         cur_text = all_info[i]
-    #         print(cur_text)
-    #         if i == 0:
-    #             group_string += (cur_text[4] + " " + cur_text[5])
-    #         else:
-    #             if cur_text[1] == '(':
-    #                 res = find_all_subclasses(i, (cur_text[4] + " " + cur_text[5]))
-    #                 group_string += ('(' + res + ')')
-    #             else:
-    #                 print('hi')
-
-    # def find_all_subclasses(index: int, cur_string: str) -> str:
-    #     if all_info[index][8] == ')':
-    #         return cur_string + (all_info[index][4] + " " + all_info[index][5])
-    #     elif all_info[index][1] == '(':
-    #         return find_all_subclasses(index + 1, (all_info[index][4] + " " + all_info[index][5]))
-    #     else:
-    #         cur_string += (all_info[index][4] + " " + all_info[index][5])
-    #         return find_all_subclasses(index + 1, cur_string)
 
 
 async def get_class_corequisites(

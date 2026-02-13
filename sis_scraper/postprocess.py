@@ -60,6 +60,7 @@ class CodeMapper:
         if path.exists() and not path.is_dir():
             try:
                 with path.open("r", encoding="utf-8") as f:
+                    logger.info(f"Loading existing code mapping from {path}")
                     return json.load(f)
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding JSON from {path}: {e}")

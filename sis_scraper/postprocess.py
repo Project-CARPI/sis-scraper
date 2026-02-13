@@ -336,7 +336,7 @@ def main(
         + str(attribute_code_name_map_path)
     )
     logger.info(
-        f"Saving {num_instructor_rcsids} generated instructor RCSIDs to "
+        f"Saving {num_generated_instructor_rcsids} generated instructor RCSIDs to "
         + str(generated_instructor_rcsid_name_map_path)
     )
     logger.info(

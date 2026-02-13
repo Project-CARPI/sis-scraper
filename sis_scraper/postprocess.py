@@ -32,9 +32,15 @@ class CodeMapper:
         # Reverse map for subject name to code lookup
         self.subject_name_to_code = {v: k for k, v in self.subjects.items()}
 
+        # Enforce tuple values for instructor data
+        self.generated_instructors = {
+            k: tuple(v) for k, v in self.generated_instructors.items()
+        }
+        self.instructors = {k: tuple(v) for k, v in self.instructors.items()}
+
         # Reverse map for instructor name to generated RCSID lookup
         self.generated_instructor_name_to_rcsid = {
-            v: k for k, v in self.generated_instructors.items()
+            v[0]: k for k, v in self.generated_instructors.items()
         }
 
     def _normalize_restrictions(self) -> None:

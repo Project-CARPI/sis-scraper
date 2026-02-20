@@ -156,14 +156,14 @@ class CodeMapper:
         return None
 
     def generate_rcsid(self, instructor_name: str) -> str:
-        # Match "Last, First"
-        instructor_name_pattern = r"(.+), (.+)"
-        match = re.match(instructor_name_pattern, instructor_name)
-        if match is None or len(match.groups()) != 2:
+        # Assume instructor name is in "Last First" format
+        # Some names have more than two parts, but we will only consider the first two
+        instructor_name_split = instructor_name.split()
+        if len(instructor_name_split) < 2:
             logger.warning(f"Unexpected instructor name format: {instructor_name}")
             # Fallback: remove spaces and lowercase
             return re.sub(r"\s+", "", instructor_name).lower()[:8]
-        last_name = match.group(1)
+        last_name = instructor_name_split[0]
         last_name_component = ""
         # Extract up to first 5 alphabetic characters from last name
         for char in last_name:
@@ -171,7 +171,7 @@ class CodeMapper:
                 last_name_component += char.lower()
             if len(last_name_component) == 5:
                 break
-        first_name = match.group(2)
+        first_name = instructor_name_split[1]
         # Extract first alphabetic character from first name
         first_name_initial = ""
         for char in first_name:

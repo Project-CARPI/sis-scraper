@@ -2,7 +2,6 @@ import asyncio
 import datetime as dt
 import json
 import logging
-import re
 import time
 from pathlib import Path
 from typing import Any
@@ -61,9 +60,6 @@ async def process_class_details(
     sis_class_entry: dict[str, Any] | None = None,
     term: str | None = None,
     crn: str | None = None,
-    instructor_rcsid_name_map: dict[str, str] = None,
-    attribute_code_name_map: dict[str, str] = None,
-    restriction_code_name_map: dict[str, dict[str, str]] = None,
 ) -> None:
     """
     Fetches and parses all details for a given class, populating the provided
@@ -72,16 +68,14 @@ async def process_class_details(
     Takes as input class data fetched from SIS's class search endpoint.
 
     @param session: aiohttp client session to use for requests.
-    @param subj_class_data: Subject course data dictionary to populate with class entries.
-    @param sis_class_entry: Class data fetched from SIS's class search
-        endpoint.
+    @param term_course_data: Term course data dictionary to populate with class data.
     @param term_crn_set: Set of all CRNs processed in the term.
-    @param known_rcsid_set: Optional set to populate with known instructor
-        RCSIDs.
-    @param attribute_code_name_map: Optional map to populate with attribute
-        codes to names.
-    @param restriction_code_name_map: Optional map to populate with restriction
-        codes to names.
+    @param sis_class_entry: Class data fetched from SIS's class search
+            endpoint.
+    @param term: Term code of the class to fetch details for. Required if
+        sis_class_entry is not provided.
+    @param crn: CRN of the class to fetch details for. Required if
+        sis_class_entry is not provided.
     @return: None
     """
     if sis_class_entry is None and (term is None or crn is None):
@@ -199,78 +193,8 @@ async def process_class_details(
     if course_num not in subj_course_data:
         subj_course_data[course_num] = []
 
-    # Process faculty RCSIDs and names
-    for faculty in class_entry["faculty"]:
-        faculty_name = faculty["displayName"]
-        email_address = faculty["emailAddress"]
-        # Add faculty RCSID to known RCSID map if provided
-        if (
-            email_address is not None
-            and email_address.endswith("@rpi.edu")
-            and instructor_rcsid_name_map is not None
-        ):
-            rcsid = email_address.split("@")[0].lower()
-            instructor_rcsid_name_map[rcsid] = faculty_name
-
     # Add class entry to subject course data
     subj_course_data[course_num].append(class_entry)
-
-    # Add to attribute code-to-name map
-    # Attributes are known to be in the format "Attribute Name  CODE"
-    # Note the double space between name and code
-    if attribute_code_name_map is not None:
-        for attribute in attributes_data:
-            attribute_split = attribute.split()
-            if len(attribute_split) < 2:
-                logger.warning(
-                    f"Skipping unexpected attribute format for CRN {crn} "
-                    f"in term {term}: {attribute}"
-                )
-                continue
-            attribute_code = attribute_split[-1].strip()
-            attribute_name = " ".join(attribute_split[:-1]).strip()
-            if (
-                attribute_code in attribute_code_name_map
-                and attribute_code_name_map[attribute_code] != attribute_name
-            ):
-                logger.warning(
-                    f"Conflicting attribute names for {attribute_code} "
-                    f"in term {term}: "
-                    f"{attribute_code_name_map[attribute_code]} vs. {attribute_name}"
-                )
-            attribute_code_name_map[attribute_code] = attribute_name
-
-    # Add to restriction code-to-name map
-    # Restrictions are known to be in the format "Restriction Name (CODE)" except
-    # for special approvals, which are handled explicitly as a special case.
-    if restriction_code_name_map is not None:
-        restriction_pattern = r"(.*)\((.*)\)"
-        for restriction_type in restrictions_data:
-            restriction_type = restriction_type.lower().replace("not_", "")
-            if restriction_type not in restriction_code_name_map:
-                restriction_code_name_map[restriction_type] = {}
-            for restriction in restrictions_data[restriction_type]:
-                restriction_match = re.match(restriction_pattern, restriction)
-                if restriction_match is None or len(restriction_match.groups()) < 2:
-                    # Skip unexpected restriction formats or special approvals
-                    continue
-                restriction_name = restriction_match.group(1).strip()
-                restriction_code = restriction_match.group(2).strip()
-                if (
-                    restriction_name in restriction_code_name_map[restriction_type]
-                    and restriction_code_name_map[restriction_type][restriction_code]
-                    != restriction_name
-                ):
-                    logger.warning(
-                        f"Conflicting restriction names for {restriction_code} "
-                        f"in term {term}: "
-                        f"{restriction_code_name_map[
-                            restriction_type
-                        ][restriction_code]} vs. {restriction_name}"
-                    )
-                restriction_code_name_map[restriction_type][
-                    restriction_code
-                ] = restriction_name
 
 
 async def get_subj_course_data(
@@ -279,9 +203,6 @@ async def get_subj_course_data(
     subject_desc: str,
     term_course_data: dict[str, dict[str, Any]],
     term_crn_set: set[str],
-    instructor_rcsid_name_map: dict[str, str] = None,
-    restriction_code_name_map: dict[str, dict[str, str]] = None,
-    attribute_code_name_map: dict[str, str] = None,
     semaphore: asyncio.Semaphore = asyncio.Semaphore(1),
     tcp_connector: aiohttp.TCPConnector = None,
     timeout: int = 30,
@@ -293,18 +214,15 @@ async def get_subj_course_data(
     other subjects that may be processing concurrently.
 
     @param term: Term code to fetch data for.
-    @param subject: Subject code to fetch data for.
+    @param subject_code: Subject code to fetch data for, e.g. "CSCI".
+    @param subject_desc: Subject description, e.g. "Computer Science".
+    @param term_course_data: Term course data dictionary to populate with subject
+        course data.
     @param term_crn_set: Set of all CRNs processed in the term.
-    @param instructor_rcsid_name_map: Optional map to populate with instructor
-        RCSIDs to names.
-    @param restriction_code_name_map: Optional map to populate with restriction
-        codes to names.
-    @param attribute_code_name_map: Optional map to populate with attribute
-        codes to names.
     @param semaphore: Semaphore to limit number of concurrent sessions between
         multiple calls to this function.
-    @param limit_per_host: Maximum number of simultaneous connections a session
-        can make to the SIS server.
+    @param tcp_connector: Optional TCP connector to use for the session. If not
+        provided, the session will use a default connector.
     @param timeout: Timeout in seconds for all requests made by a session.
     @return: Dictionary of course data keyed by course code.
     """
@@ -332,9 +250,6 @@ async def get_subj_course_data(
                                 term_course_data,
                                 term_crn_set,
                                 sis_class_entry,
-                                instructor_rcsid_name_map=instructor_rcsid_name_map,
-                                restriction_code_name_map=restriction_code_name_map,
-                                attribute_code_name_map=attribute_code_name_map,
                             )
                         )
                 # Get subject course data from term course data
@@ -357,10 +272,6 @@ async def get_subj_course_data(
 async def get_term_course_data(
     term: str,
     output_path: Path | str,
-    subject_code_name_map: dict[str, str] = None,
-    instructor_rcsid_name_map: dict[str, str] = None,
-    restriction_code_name_map: dict[str, dict[str, str]] = None,
-    attribute_code_name_map: dict[str, str] = None,
     semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
     tcp_connector: aiohttp.TCPConnector = None,
     timeout: int = 30,
@@ -374,17 +285,9 @@ async def get_term_course_data(
 
     @param term: Term code to fetch data for.
     @param output_path: Path to write term course data JSON file to.
-    @param subject_code_name_map: Optional map to populate with subject codes to
-        names.
-    @param instructor_rcsid_name_map: Optional map to populate with instructor
-        RCSIDs to names.
-    @param restriction_code_name_map: Optional map to populate with restriction
-        codes to names.
-    @param attribute_code_name_map: Optional map to populate with attribute
-        codes to names.
     @param semaphore: Semaphore to limit number of concurrent sessions.
-    @param limit_per_host: Maximum number of simultaneous connections a session
-        can make to the SIS server.
+    @param tcp_connector: Optional TCP connector to use for all sessions. If not
+        provided, sessions will use default connectors.
     @param timeout: Timeout in seconds for all requests made by a session.
     @return: None
     """
@@ -398,20 +301,6 @@ async def get_term_course_data(
         logger.error(f"Error fetching subjects for term {term}: {e}")
         return False
 
-    # Build subject code to name map
-    if subject_code_name_map is not None:
-        for subject in subjects:
-            if (
-                subject["code"] in subject_code_name_map
-                and subject_code_name_map[subject["code"]] != subject["description"]
-            ):
-                logger.warning(
-                    f"Conflicting subject names for {subject['code']} "
-                    f"in term {term}: "
-                    f"{subject_code_name_map[subject['code']]} "
-                    f"vs. {subject['description']}"
-                )
-            subject_code_name_map[subject["code"]] = subject["description"]
     logger.info(f"Processing {len(subjects)} subjects for term: {term}")
 
     # Stores all course data for the term
@@ -438,9 +327,6 @@ async def get_term_course_data(
                         subject_desc,
                         term_course_data,
                         term_crn_set,
-                        instructor_rcsid_name_map=instructor_rcsid_name_map,
-                        restriction_code_name_map=restriction_code_name_map,
-                        attribute_code_name_map=attribute_code_name_map,
                         semaphore=semaphore,
                         tcp_connector=tcp_connector,
                         timeout=timeout,
@@ -526,10 +412,6 @@ async def main(
     start_year: int = 1998,
     end_year: int = dt.datetime.now().year,
     seasons: list[str] | None = None,
-    attribute_code_name_map_path: Path | str | None = None,
-    instructor_rcsid_name_map_path: Path | str | None = None,
-    restriction_code_name_map_path: Path | str | None = None,
-    subject_code_name_map_path: Path | str | None = None,
     max_concurrent_sessions: int = 25,
     limit_per_host: int = 75,
     timeout: int = 30,
@@ -541,16 +423,6 @@ async def main(
     Spawns multiple client sessions to process subjects in parallel, with each
     session responsible for processing one subject.
 
-    Course data including restrictions, attributes, instructor names, and
-    subject names are codified using code-to-name maps whose file paths may be
-    provided. For each map file path parameter:
-    - If not provided, the map will be constructed and stored only in memory
-      during scraping.
-    - If provided but doesn't exist, the map will be constructed and written to
-      the file as JSON after scraping.
-    - If provided and does exist, the map will be loaded from the file before
-      scraping and updated after scraping.
-
     @param output_data_dir: Directory to write term course data JSON files to.
     @param start_year: Starting year (inclusive) to scrape data for. Defaults
         to 1998.
@@ -559,14 +431,6 @@ async def main(
     @param seasons: List of academic seasons to scrape data for. Can be any
         combination of "spring", "summer", and "fall". If not specified, all
         three seasons will be processed.
-    @param attribute_code_name_map_path: Path to load/save attribute code
-        mapping JSON file.
-    @param instructor_rcsid_name_map_path: Path to load/save instructor RCSID
-        mapping JSON file.
-    @param restriction_code_name_map_path: Path to load/save restriction code
-        mapping JSON file.
-    @param subject_code_name_map_path: Path to load/save subject code mapping
-        JSON file.
     @param max_concurrent_sessions: Maximum number of concurrent client sessions to
         spawn.
     @param limit_per_host: Maximum number of simultaneous connections a session
@@ -579,89 +443,10 @@ async def main(
         logger.fatal("No data output directory specified")
         return False
 
-    # Convert paths to Path objects if given as strings
-    if isinstance(output_data_dir, str):
-        output_data_dir = Path(output_data_dir)
-    if isinstance(attribute_code_name_map_path, str):
-        attribute_code_name_map_path = Path(attribute_code_name_map_path)
-    if isinstance(instructor_rcsid_name_map_path, str):
-        instructor_rcsid_name_map_path = Path(instructor_rcsid_name_map_path)
-    if isinstance(restriction_code_name_map_path, str):
-        restriction_code_name_map_path = Path(restriction_code_name_map_path)
-    if isinstance(subject_code_name_map_path, str):
-        subject_code_name_map_path = Path(subject_code_name_map_path)
-
     start_time = time.time()
 
     if seasons is None:
         seasons = ["spring", "summer", "fall"]
-
-    # Create code to name maps for codifying scraped data in post-processing
-    subject_code_name_map = {}
-    instructor_rcsid_name_map = {}
-    restriction_code_name_map = {}
-    attribute_code_name_map = {}
-
-    # Load code maps for codifying scraped data in post-processing
-    try:
-        if attribute_code_name_map_path and attribute_code_name_map_path.exists():
-            with attribute_code_name_map_path.open("r", encoding="utf-8") as f:
-                attribute_code_name_map = json.load(f)
-            logger.info(
-                f"Loaded {len(attribute_code_name_map)} attribute code mappings "
-                f"from {attribute_code_name_map_path}"
-            )
-        elif attribute_code_name_map_path:
-            logger.info(
-                f"No existing attribute code mappings found "
-                f"at {attribute_code_name_map_path}"
-            )
-
-        if instructor_rcsid_name_map_path and instructor_rcsid_name_map_path.exists():
-            with instructor_rcsid_name_map_path.open("r", encoding="utf-8") as f:
-                instructor_rcsid_name_map = json.load(f)
-            logger.info(
-                f"Loaded {len(instructor_rcsid_name_map)} instructor RCSID mappings "
-                f"from {instructor_rcsid_name_map_path}"
-            )
-        elif instructor_rcsid_name_map_path:
-            logger.info(
-                f"No existing instructor RCSID mappings found "
-                f"at {instructor_rcsid_name_map_path}"
-            )
-
-        if restriction_code_name_map_path and restriction_code_name_map_path.exists():
-            with restriction_code_name_map_path.open("r", encoding="utf-8") as f:
-                restriction_code_name_map = json.load(f)
-            logger.info(
-                f"Loaded {len(restriction_code_name_map)} restriction code mappings "
-                f"from {restriction_code_name_map_path}"
-            )
-        elif restriction_code_name_map_path:
-            logger.info(
-                f"No existing restriction code mappings found "
-                f"at {restriction_code_name_map_path}"
-            )
-
-        if subject_code_name_map_path and subject_code_name_map_path.exists():
-            with subject_code_name_map_path.open("r", encoding="utf-8") as f:
-                subject_code_name_map = json.load(f)
-            logger.info(
-                f"Loaded {len(subject_code_name_map)} subject code mappings "
-                f"from {subject_code_name_map_path}"
-            )
-        elif subject_code_name_map_path:
-            logger.info(
-                f"No existing subject code mappings found "
-                f"at {subject_code_name_map_path}"
-            )
-    except Exception as e:
-        import traceback
-
-        logger.fatal(
-            f"Error loading code mapping files: {e}" f"\n{traceback.format_exc()}"
-        )
-        return False
 
     # Limit concurrent client sessions and simultaneous connections
     semaphore = asyncio.Semaphore(max_concurrent_sessions)
@@ -694,10 +479,6 @@ async def main(
                             get_term_course_data(
                                 term,
                                 output_path=output_path,
-                                subject_code_name_map=subject_code_name_map,
-                                instructor_rcsid_name_map=instructor_rcsid_name_map,
-                                restriction_code_name_map=restriction_code_name_map,
-                                attribute_code_name_map=attribute_code_name_map,
                                 semaphore=semaphore,
                                 tcp_connector=tcp_connector,
                                 timeout=timeout,
@@ -715,53 +496,6 @@ async def main(
         import traceback
 
         logger.fatal(f"Error in SIS scraper: {e}\n{traceback.format_exc()}")
-        return False
-
-    # Write code maps to JSON files if code mapping paths are provided
-    try:
-        if attribute_code_name_map_path:
-            attribute_code_name_map_path.parent.mkdir(parents=True, exist_ok=True)
-            attribute_code_name_map = dict(sorted(attribute_code_name_map.items()))
-            logger.info(
-                f"Writing {len(attribute_code_name_map)} attribute code mappings "
-                f"to {attribute_code_name_map_path}"
-            )
-            with attribute_code_name_map_path.open("w", encoding="utf-8") as f:
-                json.dump(attribute_code_name_map, f, indent=4, ensure_ascii=False)
-
-        if instructor_rcsid_name_map_path:
-            instructor_rcsid_name_map_path.parent.mkdir(parents=True, exist_ok=True)
-            instructor_rcsid_name_map = dict(sorted(instructor_rcsid_name_map.items()))
-            logger.info(
-                f"Writing {len(instructor_rcsid_name_map)} instructor RCSID mappings "
-                f"to {instructor_rcsid_name_map_path}"
-            )
-            with instructor_rcsid_name_map_path.open("w", encoding="utf-8") as f:
-                json.dump(instructor_rcsid_name_map, f, indent=4, ensure_ascii=False)
-
-        if restriction_code_name_map_path:
-            restriction_code_name_map_path.parent.mkdir(parents=True, exist_ok=True)
-            restriction_code_name_map = dict(sorted(restriction_code_name_map.items()))
-            logger.info(
-                f"Writing {len(restriction_code_name_map)} restriction code mappings "
-                f"to {restriction_code_name_map_path}"
-            )
-            with restriction_code_name_map_path.open("w", encoding="utf-8") as f:
-                json.dump(restriction_code_name_map, f, indent=4, ensure_ascii=False)
-
-        if subject_code_name_map_path:
-            subject_code_name_map_path.parent.mkdir(parents=True, exist_ok=True)
-            subject_code_name_map = dict(sorted(subject_code_name_map.items()))
-            logger.info(
-                f"Writing {len(subject_code_name_map)} subject code mappings "
-                f"to {subject_code_name_map_path}"
-            )
-            with subject_code_name_map_path.open("w", encoding="utf-8") as f:
-                json.dump(subject_code_name_map, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        import traceback
-
-        logger.error(f"Error writing code mapping files: {e}\n{traceback.format_exc()}")
         return False
 
     end_time = time.time()

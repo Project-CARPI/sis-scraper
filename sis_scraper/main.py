@@ -89,10 +89,6 @@ if __name__ == "__main__":
                 output_data_dir=output_data_dir,
                 start_year=start_year,
                 end_year=end_year,
-                attribute_code_name_map_path=attribute_code_name_map_path,
-                instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
-                restriction_code_name_map_path=restriction_code_name_map_path,
-                subject_code_name_map_path=subject_code_name_map_path,
             )
         )
 

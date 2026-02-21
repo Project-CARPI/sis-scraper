@@ -470,7 +470,7 @@ async def main(
             # Process terms in parallel
             async with asyncio.TaskGroup() as tg:
                 for year in range(start_year, end_year + 1):
-                    for season in seasons:
+                    for season in set(seasons):
                         term = get_term_code(year, season)
                         if term == "":
                             continue

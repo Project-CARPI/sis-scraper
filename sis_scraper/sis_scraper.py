@@ -197,7 +197,7 @@ async def process_class_details(
     subj_course_data[course_num].append(class_entry)
 
 
-async def get_subj_course_data(
+async def get_subject_course_data(
     term: str,
     subject_code: str,
     subject_desc: str,
@@ -321,7 +321,7 @@ async def get_term_course_data(
                     "courses": {},
                 }
                 task = tg.create_task(
-                    get_subj_course_data(
+                    get_subject_course_data(
                         term,
                         subject_code,
                         subject_desc,

@@ -335,21 +335,15 @@ def main(
     restriction_code_name_map_path: Path | str,
     subject_code_name_map_path: Path | str,
 ) -> None:
-    # Convert string paths to Path objects if necessary
-    if isinstance(processed_data_dir, str):
-        processed_data_dir = Path(processed_data_dir)
-    if isinstance(attribute_code_name_map_path, str):
-        attribute_code_name_map_path = Path(attribute_code_name_map_path)
-    if isinstance(instructor_rcsid_name_map_path, str):
-        instructor_rcsid_name_map_path = Path(instructor_rcsid_name_map_path)
-    if isinstance(generated_instructor_rcsid_name_map_path, str):
-        generated_instructor_rcsid_name_map_path = Path(
-            generated_instructor_rcsid_name_map_path
-        )
-    if isinstance(restriction_code_name_map_path, str):
-        restriction_code_name_map_path = Path(restriction_code_name_map_path)
-    if isinstance(subject_code_name_map_path, str):
-        subject_code_name_map_path = Path(subject_code_name_map_path)
+    # Convert to Path objects if needed
+    processed_data_dir = Path(processed_data_dir)
+    attribute_code_name_map_path = Path(attribute_code_name_map_path)
+    instructor_rcsid_name_map_path = Path(instructor_rcsid_name_map_path)
+    generated_instructor_rcsid_name_map_path = Path(
+        generated_instructor_rcsid_name_map_path
+    )
+    restriction_code_name_map_path = Path(restriction_code_name_map_path)
+    subject_code_name_map_path = Path(subject_code_name_map_path)
 
     # Initialize database connection
     engine, session_factory = init_db_connection(

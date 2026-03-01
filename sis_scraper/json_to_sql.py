@@ -2,11 +2,121 @@ import json
 from pathlib import Path
 
 import carpi_data_model.models as models
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 _engine: Engine = None
 _session_factory: sessionmaker = None
+
+class DatabaseManager:
+    """
+    A class to manage database connection and operations. It automatically initializes the
+    database connection on instantiation, and provides common database operations as
+    methods.
+    """
+
+    def __init__(
+        self,
+        db_dialect: str,
+        db_api: str,
+        db_hostname: str,
+        db_username: str,
+        db_password: str,
+        db_schema: str,
+        echo: bool = False,
+    ):
+        """
+        Initializes the database connection and session factory.
+
+        @param db_dialect: Database dialect (e.g., "mysql").
+        @param db_api: Database API (e.g., "mysqlconnector").
+        @param db_hostname: Database hostname (e.g., "localhost:3306").
+        @param db_username: Database username.
+        @param db_password: Database password.
+        @param db_schema: Database schema name.
+        @param echo: Whether to log SQL statements.
+        @return: Tuple of (Engine, sessionmaker).
+        """
+        self._db_dialect = db_dialect
+        self._db_api = db_api
+        self._db_hostname = db_hostname
+        self._db_username = db_username
+        self._db_password = db_password
+        self._db_schema = db_schema
+        self._echo = echo
+        self._engine, self._session_factory = self._init_connection()
+
+    def _init_connection(self) -> bool:
+        """
+        Initializes the database engine and session factory if they haven't been
+        initialized yet.
+        """
+        try:
+            if self._engine is None:
+                # Create the database engine using a string in the format:
+                # dialect+api://username:password@hostname/schema
+                self._engine = create_engine(
+                    f"{self._db_dialect}+{self._db_api}://"
+                    f"{self._db_username}:{self._db_password}"
+                    f"@{self._db_hostname}/{self._db_schema}",
+                    echo=self._echo,
+                )
+            if self._session_factory is None:
+                self._session_factory = sessionmaker(bind=self._engine)
+        except Exception as e:
+            print(f"Error initializing database connection: {e}")
+            return False
+        return True
+
+    def close_connection(self) -> None:
+        """
+        Closes the database connection by disposing the engine.
+        """
+        if self._engine is not None:
+            self._engine.dispose()
+            self._engine = None
+            self._session_factory = None
+
+    def generate_schema(self) -> bool:
+        """
+        Generates the database schema based on the models defined in models.py.
+        """
+        try:
+            models.Base.metadata.create_all(self._engine)
+        except Exception as e:
+            print(f"Error generating database schema: {e}")
+            return False
+        return True
+
+    def drop_all_tables(self) -> bool:
+        """
+        Drops all tables in the database.
+
+        WARNING: This will delete all data in the database. Use with caution.
+        """
+        try:
+            models.Base.metadata.drop_all(self._engine)
+        except Exception as e:
+            print(f"Error dropping all tables: {e}")
+            return False
+        return True
+
+    def commit_all(self, *models: list[models.Base]) -> bool:
+        """
+        Commits all provided models to the database in a single transaction.
+
+        @param models: Variable number of lists of model instances to commit.
+        @return: True if commit was successful, False otherwise.
+        """
+        try:
+            with self._session_factory() as session:
+                for model_list in models:
+                    session.add_all(model_list)
+                session.commit()
+        except Exception as e:
+            print(f"Error committing to database: {e}")
+            return False
+        return True
 
 
 class SemesterAgnosticData:

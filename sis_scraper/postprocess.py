@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -447,19 +448,25 @@ def main(
         subject_code_name_map_path,
     )
 
-    processed_output_data_dir.mkdir(exist_ok=True, parents=True)
-
     try:
+        processed_output_data_dir.mkdir(exist_ok=True, parents=True)
+
         # Process each term course data file
         for term_file in output_data_dir.glob("*.json"):
-            with term_file.open("r", encoding="utf-8") as f:
-                term_course_data = json.load(f)
-            process_term(term_file.stem, term_course_data, mapper)
-            # Write processed data
-            processed_file_path = processed_output_data_dir / term_file.name
-            with processed_file_path.open("w", encoding="utf-8") as f:
-                logger.info(f"Writing processed data to {processed_file_path}")
-                json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+            try:
+                with term_file.open("r", encoding="utf-8") as f:
+                    term_course_data = json.load(f)
+                process_term(term_file.stem, term_course_data, mapper)
+                # Write processed data
+                processed_file_path = processed_output_data_dir / term_file.name
+                with processed_file_path.open("w", encoding="utf-8") as f:
+                    logger.info(f"Writing processed data to {processed_file_path}")
+                    json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                logger.error(
+                    f"Error processing term data from {term_file}, aborting term: {e}"
+                    f"\n{traceback.format_exc()}"
+                )
 
         # Save updated mappings
         num_attribute_codes = len(mapper.attributes)
@@ -492,9 +499,7 @@ def main(
         mapper.save()
 
     except Exception as e:
-        import traceback
-
-        logger.fatal(f"Error during post-processing: {e}\n{traceback.format_exc()}")
+        logger.fatal(f"Error during postprocessing: {e}\n{traceback.format_exc()}")
         return False
 
     return True

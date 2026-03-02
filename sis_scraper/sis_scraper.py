@@ -3,6 +3,7 @@ import datetime as dt
 import json
 import logging
 import time
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -440,8 +441,10 @@ async def get_term_course_data(
         # Write all term data to JSON file
         write_json(term_course_data, output_path)
 
-    except Exception:
-        logger.exception(f"Fatal error processing term {term}. Aborting term.")
+    except Exception as e:
+        logger.error(
+            f"Error processing term {term}, aborting term: {e}\n{traceback.format_exc()}"
+        )
         return False
 
     return True
@@ -533,8 +536,8 @@ async def main(
                 if success:
                     num_terms_processed += 1
 
-    except Exception:
-        logger.exception("Error in SIS scraper")
+    except Exception as e:
+        logger.fatal(f"Fatal error in SIS scraper: {e}\n{traceback.format_exc()}")
         return False
 
     end_time = time.time()

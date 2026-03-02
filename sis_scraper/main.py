@@ -112,7 +112,7 @@ if __name__ == "__main__":
                 "Ensure all required DB variables are set in the .env file."
             )
             sys.exit(1)
-        json_to_sql.main(
+        if not json_to_sql.main(
             processed_data_dir=processed_data_dir,
             db_dialect=db_dialect,
             db_api=db_api,
@@ -125,4 +125,5 @@ if __name__ == "__main__":
             generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
             restriction_code_name_map_path=restriction_code_name_map_path,
             subject_code_name_map_path=subject_code_name_map_path,
-        )
+        ):
+            sys.exit(1)

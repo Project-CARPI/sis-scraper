@@ -161,9 +161,10 @@ class CodeMapper:
         instructor_name_split = instructor_name.split()
         if len(instructor_name_split) < 2:
             logger.warning(f"Unexpected instructor name format: {instructor_name}")
-            # Fallback: remove spaces and lowercase
+            # As a fallback, remove spaces and lowercase the name
             return re.sub(r"\s+", "", instructor_name).lower()[:8]
-        last_name = instructor_name_split[0]
+        # Some names may have commas in them
+        last_name = instructor_name_split[0].strip(",")
         last_name_component = ""
         # Extract up to first 5 alphabetic characters from last name
         for char in last_name:
@@ -171,7 +172,8 @@ class CodeMapper:
                 last_name_component += char.lower()
             if len(last_name_component) == 5:
                 break
-        first_name = instructor_name_split[1]
+        # Some names may have commas in them
+        first_name = instructor_name_split[1].strip(",")
         # Extract first alphabetic character from first name
         first_name_initial = ""
         for char in first_name:

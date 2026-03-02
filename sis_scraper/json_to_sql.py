@@ -150,6 +150,8 @@ def load_code_mapping(json_path: Path) -> dict:
 
 def process_term(
     term_data: dict,
+    year: int,
+    semester: str,
     course_models: list[models.Course],
     course_attribute_models: list[models.Course_Attribute],
     course_relationship_models: list[models.Course_Relationship],
@@ -247,6 +249,8 @@ def process_term(
                 seats_filled += section["seatsRegistered"]
             course_offering_models.append(
                 models.Course_Offering(
+                    sem_year=year,
+                    semester=semester,
                     subj_code=subject_code,
                     code_num=course_num,
                     seats_total=seats_total,
@@ -257,6 +261,8 @@ def process_term(
             for faculty in main_section["faculty"]:
                 course_faculty_models.append(
                     models.Course_Faculty(
+                        sem_year=year,
+                        semester=semester,
                         subj_code=subject_code,
                         code_num=course_num,
                         rcsid=faculty["rcsid"],

@@ -53,13 +53,27 @@ def get_term_code(year: str | int, season: str) -> str:
     return season_map.get(season_lower, "")
 
 
+def write_json(json_data: dict[str, Any], output_path: Path | str) -> None:
+    """
+    Helper function to write JSON data to a file with error handling.
+
+    @param json_data: The JSON data to write to the file.
+    @param output_path: The path to the file to write the JSON data to.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Writing data to {output_path}")
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(json_data, f, indent=4, ensure_ascii=False)
+
+
 async def process_class_details(
     session: aiohttp.ClientSession,
     term_crn_set: set[str],
     sis_class_entry: dict[str, Any] | None = None,
     term: str | None = None,
     crn: str | None = None,
-) -> tuple[str, str, dict[str, Any]] | None:
+) -> tuple[str, str, dict[str, Any]]:
     """
     Fetches and parses all details for a given class. Returns a tuple containing
     the subject description, course number, and the fully populated class entry.
@@ -78,11 +92,7 @@ async def process_class_details(
         or None on error.
     """
     if sis_class_entry is None and (term is None or crn is None):
-        logger.error(
-            "Either sis_class_entry or both term and crn must be provided "
-            "to process_class_details"
-        )
-        return None
+        raise ValueError("Either sis_class_entry or both term and crn must be provided")
 
     # Extract basic class details from SIS class entry if provided
     if sis_class_entry is not None:
@@ -190,6 +200,62 @@ async def process_class_details(
     return subject_desc, course_num, class_entry
 
 
+async def resolve_hidden_classes(
+    term: str,
+    term_course_data: dict[str, dict[str, Any]],
+    term_crn_set: set[str],
+    semaphore: asyncio.Semaphore,
+    tcp_connector: aiohttp.TCPConnector,
+    timeout: int,
+) -> list[tuple[str, str, dict[str, Any]]]:
+    """
+    Checks all crosslist CRNs in the term course data for any hidden classes not shown in
+    the main class search and fetches their details to add to the term course data.
+
+    @param term: Term code to fetch hidden classes for.
+    @param term_course_data: The current term course data to check for hidden classes.
+    @param term_crn_set: Set of all CRNs processed in the term.
+    @param semaphore: Semaphore to limit number of concurrent sessions between
+        multiple calls to this function.
+    @param tcp_connector: TCP connector to use for client sessions.
+    @param timeout: Timeout in seconds for all requests made by a session.
+    @return: List of tuples containing subject description, course number, and
+        class entry data for each hidden class found.
+    """
+    async with semaphore:
+        timeout_obj = aiohttp.ClientTimeout(total=timeout)
+
+        async with aiohttp.ClientSession(
+            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
+        ) as session:
+            hidden_crns = {
+                crosslist["courseReferenceNumber"]
+                for subject in term_course_data.values()
+                for course in subject["courses"].values()
+                for class_entry in course
+                for crosslist in class_entry["crosslists"]
+                if crosslist["courseReferenceNumber"] not in term_crn_set
+            }
+            if len(hidden_crns) > 0:
+                hidden_class_tasks = []
+                async with asyncio.TaskGroup() as tg:
+                    for crn in hidden_crns:
+                        task = tg.create_task(
+                            process_class_details(
+                                session,
+                                term_crn_set,
+                                term=term,
+                                crn=crn,
+                            )
+                        )
+                        hidden_class_tasks.append(task)
+                        logger.info(
+                            f"Processing hidden class with CRN {crn} in term {term}"
+                        )
+                return [task.result() for task in hidden_class_tasks]
+        return []
+
+
 async def get_subject_course_data(
     term: str,
     subject_code: str,
@@ -264,11 +330,11 @@ async def get_subject_course_data(
                 # Return data sorted by course code
                 return dict(sorted(subj_course_data.items()))
 
-            except aiohttp.ClientError as e:
-                logger.error(
-                    f"Error processing subject {subject_code} in term {term}: {e}"
-                )
-                return {}
+            except Exception as e:
+                raise RuntimeError(
+                    f"Error fetching course data for subject {subject_code} "
+                    f"in term {term}"
+                ) from e
 
 
 async def get_term_course_data(
@@ -277,7 +343,7 @@ async def get_term_course_data(
     semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
     tcp_connector: aiohttp.TCPConnector = None,
     timeout: int = 30,
-) -> None:
+) -> bool:
     """
     Gets all course data for a given term, which includes all subjects in the
     term.
@@ -291,7 +357,7 @@ async def get_term_course_data(
     @param tcp_connector: Optional TCP connector to use for all sessions. If not
         provided, sessions will use default connectors.
     @param timeout: Timeout in seconds for all requests made by a session.
-    @return: None
+    @return: True on success, False on any unhandled failure.
     """
     timeout_obj = aiohttp.ClientTimeout(total=timeout)
     try:
@@ -299,21 +365,19 @@ async def get_term_course_data(
             connector=tcp_connector, connector_owner=False, timeout=timeout_obj
         ) as session:
             subjects = await get_term_subjects(session, term)
-    except aiohttp.ClientError as e:
-        logger.error(f"Error fetching subjects for term {term}: {e}")
-        return False
 
-    logger.info(f"Processing {len(subjects)} subjects for term: {term}")
+        if len(subjects) == 0:
+            logger.info(f"No subjects found for term {term}")
+            return False
+        logger.info(f"Processing {len(subjects)} subjects for term {term}")
 
-    # Stores all course data for the term
-    term_course_data = {}
+        # Stores all course data for the term
+        term_course_data = {}
+        # Stores all CRNs for the term
+        term_crn_set = set()
 
-    # Stores all CRNs for the term
-    term_crn_set = set()
-
-    # Process subjects in parallel, each with its own session
-    tasks: list[asyncio.Task] = []
-    try:
+        # Process subjects in parallel, each with its own session
+        tasks: list[asyncio.Task] = []
         async with asyncio.TaskGroup() as tg:
             for subject in subjects:
                 subject_code = subject["code"]
@@ -333,90 +397,51 @@ async def get_term_course_data(
                     )
                 )
                 tasks.append(task)
-    except Exception as e:
-        import traceback
 
-        logger.error(
-            f"Error processing subjects for term {term}: {e}"
-            f"\n{traceback.format_exc()}"
+        # Wait for all tasks to complete and gather results
+        for i, subject in enumerate(subjects):
+            course_data = tasks[i].result()
+            term_course_data[subject["description"]]["courses"] = course_data
+
+        # Stop if no course data was fetched for the term
+        # Likely indicates a scraper error since every valid term should have some data
+        if len(term_course_data) == 0:
+            logger.warning(f"No course data found for term {term}")
+            return False
+
+        # Check for hidden classes via crosslists and add them to term course data
+        hidden_classes = await resolve_hidden_classes(
+            term, term_course_data, term_crn_set, semaphore, tcp_connector, timeout
         )
-        return False
+        for subject_desc, course_num, class_entry in hidden_classes:
+            if subject_desc in term_course_data:
+                subj_course_data = term_course_data[subject_desc]["courses"]
+                if course_num not in subj_course_data:
+                    subj_course_data[course_num] = []
+                subj_course_data[course_num].append(class_entry)
+            else:
+                logger.warning(
+                    f"Subject {subject_desc} not found in term_course_data "
+                    f"for CRN {class_entry['courseReferenceNumber']}"
+                )
 
-    # Wait for all tasks to complete and gather results
-    for i, subject in enumerate(subjects):
-        course_data = tasks[i].result()
-        term_course_data[subject["description"]]["courses"] = course_data
-
-    if len(term_course_data) == 0:
-        return False
-
-    # Check all crosslist CRNs in the term course data for any hidden classes not shown in
-    # the main class search and fetch their details.
-    async with semaphore:
-        async with aiohttp.ClientSession(
-            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
-        ) as session:
-            hidden_crns = {
-                crosslist["courseReferenceNumber"]
-                for subject in term_course_data.values()
-                for course in subject["courses"].values()
-                for class_entry in course
-                for crosslist in class_entry["crosslists"]
-                if crosslist["courseReferenceNumber"] not in term_crn_set
+        # Convert term course data to be keyed by subject code instead of description
+        term_course_data_by_code = {}
+        for subject_desc, data in term_course_data.items():
+            subject_code = data["subjectCode"]
+            term_course_data_by_code[subject_code] = {
+                "subjectDescription": subject_desc,
+                **data,
             }
-            if len(hidden_crns) > 0:
-                hidden_class_tasks = []
-                async with asyncio.TaskGroup() as tg:
-                    for crn in hidden_crns:
-                        task = tg.create_task(
-                            process_class_details(
-                                session,
-                                term_crn_set,
-                                term=term,
-                                crn=crn,
-                            )
-                        )
-                        hidden_class_tasks.append(task)
-                        logger.info(
-                            f"Processing hidden class with CRN {crn} in term {term}"
-                        )
-                for task in hidden_class_tasks:
-                    result = task.result()
-                    if result:
-                        subject_desc, course_num, class_entry = result
-                        if subject_desc in term_course_data:
-                            subj_course_data = term_course_data[subject_desc]["courses"]
-                            if course_num not in subj_course_data:
-                                subj_course_data[course_num] = []
-                            subj_course_data[course_num].append(class_entry)
-                        else:
-                            logger.warning(
-                                f"Subject {subject_desc} not found in term_course_data"
-                                f"for CRN {class_entry['courseReferenceNumber']}"
-                            )
+            # Remove redundant subject code entry
+            del term_course_data_by_code[subject_code]["subjectCode"]
+        term_course_data = term_course_data_by_code
 
-    # Convert term course data to be keyed by subject code instead of description
-    term_course_data_by_code = {}
-    for subject_desc, data in term_course_data.items():
-        subject_code = data["subjectCode"]
-        term_course_data_by_code[subject_code] = {
-            "subjectDescription": subject_desc,
-            **data,
-        }
-        # Remove redundant subject code entry
-        del term_course_data_by_code[subject_code]["subjectCode"]
-    term_course_data = term_course_data_by_code
+        # Write all term data to JSON file
+        write_json(term_course_data, output_path)
 
-    # Write all term data to JSON file
-    if isinstance(output_path, str):
-        output_path = Path(output_path)
-    try:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Writing data to {output_path}")
-        with output_path.open("w", encoding="utf-8") as f:
-            json.dump(term_course_data, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        logger.error(f"Error writing data to {output_path}: {e}")
+    except Exception:
+        logger.exception(f"Fatal error processing term {term}. Aborting term.")
         return False
 
     return True
@@ -503,14 +528,13 @@ async def main(
 
             # Wait for all tasks to complete
             for task in tasks:
+                # Count number of successfully processed terms
                 success = task.result()
                 if success:
                     num_terms_processed += 1
 
-    except Exception as e:
-        import traceback
-
-        logger.fatal(f"Error in SIS scraper: {e}\n{traceback.format_exc()}")
+    except Exception:
+        logger.exception("Error in SIS scraper")
         return False
 
     end_time = time.time()

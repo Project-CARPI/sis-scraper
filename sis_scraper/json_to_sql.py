@@ -150,6 +150,71 @@ def load_code_mapping(json_path: Path) -> dict:
         return json.load(f)
 
 
+def load_code_mappings(
+    attribute_code_name_map_path: Path,
+    instructor_rcsid_name_map_path: Path,
+    generated_instructor_rcsid_name_map_path: Path,
+    restriction_code_name_map_path: Path,
+    subject_code_name_map_path: Path,
+) -> dict:
+    """
+    Loads multiple code mappings from a list of JSON files and combines them into a single
+    dictionary.
+
+    @param attribute_code_name_map_path: Path to the attribute code mapping JSON file.
+    @param instructor_rcsid_name_map_path: Path to the instructor RCID name mapping JSON file.
+    @param generated_instructor_rcsid_name_map_path: Path to the generated instructor RCID name mapping JSON file.
+    @param restriction_code_name_map_path: Path to the restriction code mapping JSON file.
+    @param subject_code_name_map_path: Path to the subject code mapping JSON file.
+    @return: Dictionary representing the combined code mappings.
+    """
+    code_mappings = {}
+    attribute_data: dict[str, str] = load_code_mapping(attribute_code_name_map_path)
+    code_mappings["attribute_models"] = [
+        models.Attribute(
+            attr_code=code,
+            title=description,
+        )
+        for code, description in attribute_data.items()
+    ]
+    faculty_data: dict[str, list[str]] = load_code_mapping(
+        instructor_rcsid_name_map_path
+    )
+    generated_faculty_data: dict[str, list[str]] = load_code_mapping(
+        generated_instructor_rcsid_name_map_path
+    )
+    code_mappings["faculty_models"] = [
+        models.Faculty(
+            rcsid=rcsid,
+            # Assume first name is everything after the first space
+            first_name=" ".join(name.split()[1:]).strip(),
+            last_name=name.split()[0].strip(),
+        )
+        for rcsid, [name, _] in (faculty_data | generated_faculty_data).items()
+    ]
+    restriction_data: dict[str, dict[str, str]] = load_code_mapping(
+        restriction_code_name_map_path
+    )
+    code_mappings["restriction_models"] = [
+        models.Restriction(
+            category=restriction_category.upper(),
+            restr_code=restriction_code,
+            title=description,
+        )
+        for restriction_category, restriction_list in restriction_data.items()
+        for restriction_code, description in restriction_list.items()
+    ]
+    subject_data: dict[str, str] = load_code_mapping(subject_code_name_map_path)
+    code_mappings["subject_models"] = [
+        models.Subject(
+            subj_code=code,
+            title=description,
+        )
+        for code, description in subject_data.items()
+    ]
+    return code_mappings
+
+
 def process_term(
     term_data: dict,
     year: int,
@@ -361,58 +426,18 @@ def main(
     logger.info("Generated database schema based on models.")
 
     # Load and insert code mappings first since other tables depend on them
-    attribute_data: dict[str, str] = load_code_mapping(attribute_code_name_map_path)
-    attribute_models = [
-        models.Attribute(
-            attr_code=code,
-            title=description,
-        )
-        for code, description in attribute_data.items()
-    ]
-    faculty_data: dict[str, list[str]] = load_code_mapping(
-        instructor_rcsid_name_map_path
+    code_mappings = load_code_mappings(
+        attribute_code_name_map_path=attribute_code_name_map_path,
+        instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
+        generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
+        restriction_code_name_map_path=restriction_code_name_map_path,
+        subject_code_name_map_path=subject_code_name_map_path,
     )
-    faculty_models = [
-        models.Faculty(
-            rcsid=rcsid,
-            # Assume first name is everything after the first space
-            first_name=" ".join(name.split()[1:]).strip(),
-            last_name=name.split()[0].strip(),
-        )
-        for rcsid, [name, _] in faculty_data.items()
-    ]
-    generated_faculty_data: dict[str, list[str]] = load_code_mapping(
-        generated_instructor_rcsid_name_map_path
-    )
-    generated_faculty_models = [
-        models.Faculty(
-            rcsid=rcsid,
-            # Assume first name is everything after the first space
-            first_name=" ".join(name.split()[1:]).strip(),
-            last_name=name.split()[0].strip(),
-        )
-        for rcsid, [name, _] in generated_faculty_data.items()
-    ]
-    restriction_data: dict[str, dict[str, str]] = load_code_mapping(
-        restriction_code_name_map_path
-    )
-    restriction_models = [
-        models.Restriction(
-            category=restriction_category.upper(),
-            restr_code=restriction_code,
-            title=description,
-        )
-        for restriction_category, restriction_list in restriction_data.items()
-        for restriction_code, description in restriction_list.items()
-    ]
-    subject_data: dict[str, str] = load_code_mapping(subject_code_name_map_path)
-    subject_models = [
-        models.Subject(
-            subj_code=code,
-            title=description,
-        )
-        for code, description in subject_data.items()
-    ]
+    restriction_models = code_mappings["restriction_models"]
+    attribute_models = code_mappings["attribute_models"]
+    subject_models = code_mappings["subject_models"]
+    faculty_models = code_mappings["faculty_models"]
+    generated_faculty_models = code_mappings["generated_faculty_models"]
 
     # Insert code mappings into the database
     db_manager.commit_all(

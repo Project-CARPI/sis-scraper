@@ -1,9 +1,12 @@
 import json
+import logging
 from pathlib import Path
 
 import carpi_data_model.models as models
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
@@ -53,9 +56,14 @@ class DatabaseManager:
             # Create the database engine using a string in the format:
             # dialect+api://username:password@hostname/schema
             self._engine = create_engine(
-                f"{self._db_dialect}+{self._db_api}://"
-                f"{self._db_username}:{self._db_password}"
-                f"@{self._db_hostname}/{self._db_schema}",
+                get_db_url(
+                    db_dialect=self._db_dialect,
+                    db_api=self._db_api,
+                    db_hostname=self._db_hostname,
+                    db_username=self._db_username,
+                    db_password=self._db_password,
+                    db_schema=self._db_schema,
+                ),
                 echo=self._echo,
             )
         if self._session_factory is None:
@@ -94,6 +102,33 @@ class DatabaseManager:
             for model_list in models:
                 session.add_all(model_list)
             session.commit()
+
+
+def get_db_url(
+    db_dialect: str,
+    db_api: str,
+    db_hostname: str,
+    db_username: str,
+    db_password: str,
+    db_schema: str,
+) -> str:
+    """
+    Constructs a database URL string from the provided components.
+
+    @param db_dialect: Database dialect (e.g., "mysql").
+    @param db_api: Database API (e.g., "mysqlconnector").
+    @param db_hostname: Database hostname (e.g., "localhost:3306").
+    @param db_username: Database username.
+    @param db_password: Database password.
+    @param db_schema: Database schema name.
+    @return: Database URL string in the format:
+             dialect+api://username:password@hostname/schema
+    """
+    return (
+        f"{db_dialect}+{db_api}://"
+        f"{db_username}:{db_password}"
+        f"@{db_hostname}/{db_schema}"
+    )
 
 
 def get_semester_info_from_filename(file_path: Path) -> tuple[int, str]:
@@ -286,10 +321,16 @@ def main(
         echo=False,
     )
     db_manager.init_connection()
+    logger.info(
+        "Connected to database with URL "
+        + get_db_url(db_dialect, db_api, db_hostname, db_username, "****", db_schema)
+    )
 
     # Reset database schema
     db_manager.drop_all_tables()
+    logger.info("Dropped all existing tables in the database.")
     db_manager.generate_schema()
+    logger.info("Generated database schema based on models.")
 
     # Load and insert code mappings first since other tables depend on them
     attribute_data: dict[str, str] = load_code_mapping(attribute_code_name_map_path)
@@ -353,6 +394,11 @@ def main(
         faculty_models,
         generated_faculty_models,
     )
+    logger.info(f"Committed {len(restriction_models)} restrictions")
+    logger.info(f"Committed {len(attribute_models)} attributes")
+    logger.info(f"Committed {len(subject_models)} subjects")
+    logger.info(f"Committed {len(faculty_models)} faculty members")
+    logger.info(f"Committed {len(generated_faculty_models)} generated faculty members")
 
     # Semester-agnostic data models
     course = []
@@ -391,5 +437,11 @@ def main(
         course_attribute, course_relationship, course_restriction, course_offering
     )
     db_manager.commit_all(course_faculty)
+    logger.info(f"Committed {len(course)} courses")
+    logger.info(f"Committed {len(course_attribute)} course attributes")
+    logger.info(f"Committed {len(course_relationship)} course relationships")
+    logger.info(f"Committed {len(course_restriction)} course restrictions")
+    logger.info(f"Committed {len(course_offering)} course offerings")
+    logger.info(f"Committed {len(course_faculty)} course faculty assignments")
 
     db_manager.close_connection()

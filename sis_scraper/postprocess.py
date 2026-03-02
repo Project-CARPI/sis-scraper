@@ -365,7 +365,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                         rcsid = None
                         # Either displayName or emailAddress will be present
                         if email:
-                            rcsid = email.split("@")[0]
+                            rcsid = email.split("@")[0].lower()
                         if not rcsid and name:
                             # Check if generated RCSID exists for this name
                             rcsid = mapper.get_generated_rcsid(name)

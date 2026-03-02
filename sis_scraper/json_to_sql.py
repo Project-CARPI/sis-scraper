@@ -2,15 +2,14 @@ import json
 from pathlib import Path
 
 import carpi_data_model.models as models
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import sessionmaker
 
 
 class DatabaseManager:
     """
-    A class to manage database connection and operations. It automatically initializes the
-    database connection on instantiation, and provides common database operations as
-    methods.
+    A class to manage database connection and operations. Provides common database
+    operations as methods.
     """
 
     def __init__(
@@ -42,29 +41,25 @@ class DatabaseManager:
         self._db_password = db_password
         self._db_schema = db_schema
         self._echo = echo
-        self._engine, self._session_factory = self._init_connection()
+        self._engine = None
+        self._session_factory = None
 
-    def _init_connection(self) -> bool:
+    def init_connection(self) -> None:
         """
         Initializes the database engine and session factory if they haven't been
         initialized yet.
         """
-        try:
-            if self._engine is None:
-                # Create the database engine using a string in the format:
-                # dialect+api://username:password@hostname/schema
-                self._engine = create_engine(
-                    f"{self._db_dialect}+{self._db_api}://"
-                    f"{self._db_username}:{self._db_password}"
-                    f"@{self._db_hostname}/{self._db_schema}",
-                    echo=self._echo,
-                )
-            if self._session_factory is None:
-                self._session_factory = sessionmaker(bind=self._engine)
-        except Exception as e:
-            print(f"Error initializing database connection: {e}")
-            return False
-        return True
+        if self._engine is None:
+            # Create the database engine using a string in the format:
+            # dialect+api://username:password@hostname/schema
+            self._engine = create_engine(
+                f"{self._db_dialect}+{self._db_api}://"
+                f"{self._db_username}:{self._db_password}"
+                f"@{self._db_hostname}/{self._db_schema}",
+                echo=self._echo,
+            )
+        if self._session_factory is None:
+            self._session_factory = sessionmaker(bind=self._engine)
 
     def close_connection(self) -> None:
         """
@@ -75,46 +70,30 @@ class DatabaseManager:
             self._engine = None
             self._session_factory = None
 
-    def generate_schema(self) -> bool:
+    def generate_schema(self) -> None:
         """
         Generates the database schema based on the models defined in models.py.
         """
-        try:
-            models.Base.metadata.create_all(self._engine)
-        except Exception as e:
-            print(f"Error generating database schema: {e}")
-            return False
-        return True
+        models.Base.metadata.create_all(self._engine)
 
-    def drop_all_tables(self) -> bool:
+    def drop_all_tables(self) -> None:
         """
         Drops all tables in the database.
 
         WARNING: This will delete all data in the database. Use with caution.
         """
-        try:
-            models.Base.metadata.drop_all(self._engine)
-        except Exception as e:
-            print(f"Error dropping all tables: {e}")
-            return False
-        return True
+        models.Base.metadata.drop_all(self._engine)
 
-    def commit_all(self, *models: list[models.Base]) -> bool:
+    def commit_all(self, *models: list[models.Base]) -> None:
         """
         Commits all provided models to the database in a single transaction.
 
         @param models: Variable number of lists of model instances to commit.
-        @return: True if commit was successful, False otherwise.
         """
-        try:
-            with self._session_factory() as session:
-                for model_list in models:
-                    session.add_all(model_list)
-                session.commit()
-        except Exception as e:
-            print(f"Error committing to database: {e}")
-            return False
-        return True
+        with self._session_factory() as session:
+            for model_list in models:
+                session.add_all(model_list)
+            session.commit()
 
 
 def get_semester_info_from_filename(file_path: Path) -> tuple[int, str]:
@@ -304,6 +283,8 @@ def main(
         db_schema=db_schema,
         echo=False,
     )
+    db_manager.init_connection()
+
     # Reset database schema
     db_manager.drop_all_tables()
     db_manager.generate_schema()

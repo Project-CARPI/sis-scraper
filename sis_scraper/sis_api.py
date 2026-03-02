@@ -352,6 +352,7 @@ async def get_class_description(
     for text in description_text_list:
         if text != "":
             return text
+    return ""
 
 
 async def get_class_enrollment(

@@ -89,6 +89,7 @@ class DatabaseManager:
         with self._session_factory() as session:
             for model_list in models:
                 session.add_all(model_list)
+                session.flush()
             session.commit()
 
 
@@ -371,7 +372,7 @@ def main(
     generated_instructor_rcsid_name_map_path: Path | str,
     restriction_code_name_map_path: Path | str,
     subject_code_name_map_path: Path | str,
-) -> None:
+) -> bool:
     """
     Runs the JSON to SQL conversion process: initializes the database connection,
     processes each term's data, and commits the resulting models to the database.
@@ -392,8 +393,9 @@ def main(
     @param restriction_code_name_map_path: Path to JSON file mapping restriction codes to
         names.
     @param subject_code_name_map_path: Path to JSON file mapping subject codes to names.
+    @return: True if the process completes successfully, False if an error occurs.
     """
-    # Convert to Path objects if needed
+    # Convert to Path objects
     processed_data_dir = Path(processed_data_dir)
     attribute_code_name_map_path = Path(attribute_code_name_map_path)
     instructor_rcsid_name_map_path = Path(instructor_rcsid_name_map_path)
@@ -403,98 +405,107 @@ def main(
     restriction_code_name_map_path = Path(restriction_code_name_map_path)
     subject_code_name_map_path = Path(subject_code_name_map_path)
 
-    # Initialize database connection
-    db_manager = DatabaseManager(
-        db_dialect=db_dialect,
-        db_api=db_api,
-        db_hostname=db_hostname,
-        db_username=db_username,
-        db_password=db_password,
-        db_schema=db_schema,
-        echo=False,
-    )
-    db_manager.init_connection()
-    logger.info(
-        "Connected to database with URL "
-        + get_db_url(db_dialect, db_api, db_hostname, db_username, "****", db_schema)
-    )
-
-    # Reset database schema
-    db_manager.drop_all_tables()
-    logger.info("Dropped all existing tables in the database.")
-    db_manager.generate_schema()
-    logger.info("Generated database schema based on models.")
-
-    # Load and insert code mappings first since other tables depend on them
-    code_mappings = load_code_mappings(
-        attribute_code_name_map_path=attribute_code_name_map_path,
-        instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
-        generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
-        restriction_code_name_map_path=restriction_code_name_map_path,
-        subject_code_name_map_path=subject_code_name_map_path,
-    )
-    restriction_models = code_mappings["restriction_models"]
-    attribute_models = code_mappings["attribute_models"]
-    subject_models = code_mappings["subject_models"]
-    faculty_models = code_mappings["faculty_models"]
-    generated_faculty_models = code_mappings["generated_faculty_models"]
-
-    # Insert code mappings into the database
-    db_manager.commit_all(
-        restriction_models,
-        attribute_models,
-        subject_models,
-        faculty_models,
-        generated_faculty_models,
-    )
-    logger.info(f"Committed {len(restriction_models)} restrictions")
-    logger.info(f"Committed {len(attribute_models)} attributes")
-    logger.info(f"Committed {len(subject_models)} subjects")
-    logger.info(f"Committed {len(faculty_models)} faculty members")
-    logger.info(f"Committed {len(generated_faculty_models)} generated faculty members")
-
-    # Semester-agnostic data models
-    course = []
-    course_attribute = []
-    course_relationship = []
-    course_restriction = []
-
-    # Track processed courses to prioritize latest data across multiple semesters
-    processed_courses = set()
-
-    # Semester-specific data models
-    course_offering = []
-    course_faculty = []
-
-    # Process JSON files in reverse chronological order to prioritize latest data
-    for json_path in sorted(processed_data_dir.glob("*.json"), reverse=True):
-        year, semester = get_semester_info_from_filename(json_path)
-        with open(json_path, "r", encoding="utf-8") as f:
-            term_data = json.load(f)
-        process_term(
-            term_data=term_data,
-            year=year,
-            semester=semester,
-            course_models=course,
-            course_attribute_models=course_attribute,
-            course_relationship_models=course_relationship,
-            course_restriction_models=course_restriction,
-            course_offering_models=course_offering,
-            course_faculty_models=course_faculty,
-            processed_courses=processed_courses,
+    try:
+        # Initialize database connection
+        db_manager = DatabaseManager(
+            db_dialect=db_dialect,
+            db_api=db_api,
+            db_hostname=db_hostname,
+            db_username=db_username,
+            db_password=db_password,
+            db_schema=db_schema,
+            echo=False,
+        )
+        db_manager.init_connection()
+        logger.info(
+            "Connected to database with URL "
+            + get_db_url(
+                db_dialect, db_api, db_hostname, db_username, "****", db_schema
+            )
         )
 
-    # Insert course data into the database
-    db_manager.commit_all(course)
-    db_manager.commit_all(
-        course_attribute, course_relationship, course_restriction, course_offering
-    )
-    db_manager.commit_all(course_faculty)
-    logger.info(f"Committed {len(course)} courses")
-    logger.info(f"Committed {len(course_attribute)} course attributes")
-    logger.info(f"Committed {len(course_relationship)} course relationships")
-    logger.info(f"Committed {len(course_restriction)} course restrictions")
-    logger.info(f"Committed {len(course_offering)} course offerings")
-    logger.info(f"Committed {len(course_faculty)} course faculty assignments")
+        # Reset database schema
+        db_manager.drop_all_tables()
+        logger.info("Dropped all existing tables in the database.")
+        db_manager.generate_schema()
+        logger.info("Generated database schema based on models.")
 
-    db_manager.close_connection()
+        # Load and insert code mappings first since other tables depend on them
+        code_mappings = load_code_mappings(
+            attribute_code_name_map_path=attribute_code_name_map_path,
+            instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
+            generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
+            restriction_code_name_map_path=restriction_code_name_map_path,
+            subject_code_name_map_path=subject_code_name_map_path,
+        )
+        restriction_models = code_mappings["restriction_models"]
+        attribute_models = code_mappings["attribute_models"]
+        subject_models = code_mappings["subject_models"]
+        faculty_models = code_mappings["faculty_models"]
+
+        # Semester-agnostic data models
+        course = []
+        course_attribute = []
+        course_relationship = []
+        course_restriction = []
+
+        # Track processed courses to prioritize latest data across multiple semesters
+        processed_courses = set()
+
+        # Semester-specific data models
+        course_offering = []
+        course_faculty = []
+
+        # Process JSON files in reverse chronological order to prioritize latest data
+        for json_path in sorted(processed_data_dir.glob("*.json"), reverse=True):
+            year, semester = get_semester_info_from_filename(json_path)
+            with open(json_path, "r", encoding="utf-8") as f:
+                term_data = json.load(f)
+            process_term(
+                term_data=term_data,
+                year=year,
+                semester=semester,
+                course_models=course,
+                course_attribute_models=course_attribute,
+                course_relationship_models=course_relationship,
+                course_restriction_models=course_restriction,
+                course_offering_models=course_offering,
+                course_faculty_models=course_faculty,
+                processed_courses=processed_courses,
+            )
+
+        # Insert code mappings and course data into the database
+        db_manager.commit_all(
+            restriction_models,
+            attribute_models,
+            subject_models,
+            faculty_models,
+            course,
+            course_attribute,
+            course_relationship,
+            course_restriction,
+            course_offering,
+            course_faculty,
+        )
+        logger.info(f"Committed {len(restriction_models)} restrictions")
+        logger.info(f"Committed {len(attribute_models)} attributes")
+        logger.info(f"Committed {len(subject_models)} subjects")
+        logger.info(f"Committed {len(faculty_models)} faculty members")
+        logger.info(f"Committed {len(course)} courses")
+        logger.info(f"Committed {len(course_attribute)} course attributes")
+        logger.info(f"Committed {len(course_relationship)} course relationships")
+        logger.info(f"Committed {len(course_restriction)} course restrictions")
+        logger.info(f"Committed {len(course_offering)} course offerings")
+        logger.info(f"Committed {len(course_faculty)} course faculty assignments")
+
+        db_manager.close_connection()
+
+    except Exception as e:
+        import traceback
+
+        logger.fatal(
+            f"Error during JSON to SQL conversion: {e}\n{traceback.format_exc()}"
+        )
+        return False
+
+    return True

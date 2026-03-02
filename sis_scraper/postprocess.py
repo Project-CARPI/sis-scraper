@@ -449,45 +449,52 @@ def main(
 
     processed_output_data_dir.mkdir(exist_ok=True, parents=True)
 
-    # Process each term course data file
-    for term_file in output_data_dir.glob("*.json"):
-        with term_file.open("r", encoding="utf-8") as f:
-            term_course_data = json.load(f)
+    try:
+        # Process each term course data file
+        for term_file in output_data_dir.glob("*.json"):
+            with term_file.open("r", encoding="utf-8") as f:
+                term_course_data = json.load(f)
+            process_term(term_file.stem, term_course_data, mapper)
+            # Write processed data
+            processed_file_path = processed_output_data_dir / term_file.name
+            with processed_file_path.open("w", encoding="utf-8") as f:
+                logger.info(f"Writing processed data to {processed_file_path}")
+                json.dump(term_course_data, f, indent=4, ensure_ascii=False)
 
-        process_term(term_file.stem, term_course_data, mapper)
+        # Save updated mappings
+        num_attribute_codes = len(mapper.attributes)
+        num_generated_instructor_rcsids = len(mapper.generated_instructors)
+        num_instructor_rcsids = len(mapper.instructors)
+        num_restriction_codes = sum(
+            len(codes) for codes in mapper.restrictions.values()
+        )
+        num_subject_codes = len(mapper.subjects)
+        logger.info(
+            f"Saving {num_attribute_codes} attribute codes to "
+            + str(attribute_code_name_map_path)
+        )
+        logger.info(
+            f"Saving {num_generated_instructor_rcsids} generated instructor RCSIDs to "
+            + str(generated_instructor_rcsid_name_map_path)
+        )
+        logger.info(
+            f"Saving {num_instructor_rcsids} instructor RCSIDs to "
+            + str(instructor_rcsid_name_map_path)
+        )
+        logger.info(
+            f"Saving {num_restriction_codes} restriction codes to "
+            + str(restriction_code_name_map_path)
+        )
+        logger.info(
+            f"Saving {num_subject_codes} subject codes to "
+            + str(subject_code_name_map_path)
+        )
+        mapper.save()
 
-        # Write processed data
-        processed_file_path = processed_output_data_dir / term_file.name
-        with processed_file_path.open("w", encoding="utf-8") as f:
-            logger.info(f"Writing processed data to {processed_file_path}")
-            json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        import traceback
 
-    # Save updated mappings
-    num_attribute_codes = len(mapper.attributes)
-    num_generated_instructor_rcsids = len(mapper.generated_instructors)
-    num_instructor_rcsids = len(mapper.instructors)
-    num_restriction_codes = sum(len(codes) for codes in mapper.restrictions.values())
-    num_subject_codes = len(mapper.subjects)
-    logger.info(
-        f"Saving {num_attribute_codes} attribute codes to "
-        + str(attribute_code_name_map_path)
-    )
-    logger.info(
-        f"Saving {num_generated_instructor_rcsids} generated instructor RCSIDs to "
-        + str(generated_instructor_rcsid_name_map_path)
-    )
-    logger.info(
-        f"Saving {num_instructor_rcsids} instructor RCSIDs to "
-        + str(instructor_rcsid_name_map_path)
-    )
-    logger.info(
-        f"Saving {num_restriction_codes} restriction codes to "
-        + str(restriction_code_name_map_path)
-    )
-    logger.info(
-        f"Saving {num_subject_codes} subject codes to "
-        + str(subject_code_name_map_path)
-    )
-    mapper.save()
+        logger.fatal(f"Error during post-processing: {e}\n{traceback.format_exc()}")
+        return False
 
     return True

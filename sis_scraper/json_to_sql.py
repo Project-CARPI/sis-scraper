@@ -25,18 +25,6 @@ class DatabaseManager:
         db_schema: str,
         echo: bool = False,
     ):
-        """
-        Initializes the database connection and session factory.
-
-        @param db_dialect: Database dialect (e.g., "mysql").
-        @param db_api: Database API (e.g., "mysqlconnector").
-        @param db_hostname: Database hostname (e.g., "localhost:3306").
-        @param db_username: Database username.
-        @param db_password: Database password.
-        @param db_schema: Database schema name.
-        @param echo: Whether to log SQL statements.
-        @return: Tuple of (Engine, sessionmaker).
-        """
         self._db_dialect = db_dialect
         self._db_api = db_api
         self._db_hostname = db_hostname
@@ -121,8 +109,8 @@ def get_db_url(
     @param db_username: Database username.
     @param db_password: Database password.
     @param db_schema: Database schema name.
-    @return: Database URL string in the format:
-             dialect+api://username:password@hostname/schema
+    @return: Database URL string in the format: \
+        dialect+api://username:password@hostname/schema
     """
     return (
         f"{db_dialect}+{db_api}://"
@@ -174,6 +162,25 @@ def process_term(
     course_faculty_models: list[models.Course_Faculty],
     processed_courses: set[str],
 ) -> None:
+    """
+    Processes the data for a single term and appends model instances to the provided
+    lists.
+
+    @param term_data: Dictionary containing the term's course data.
+    @param year: Year of the term (e.g., 2024).
+    @param semester: Semester name (e.g., "FALL").
+    @param course_models: List to append Course model instances to.
+    @param course_attribute_models: List to append Course_Attribute model instances to.
+    @param course_relationship_models: List to append Course_Relationship model instances
+        to.
+    @param course_restriction_models: List to append Course_Restriction model instances
+        to.
+    @param course_offering_models: List to append Course_Offering model instances to.
+    @param course_faculty_models: List to append Course_Faculty model instances to.
+    @param processed_courses: Set of course codes that have already been processed in
+        later semesters. This is used to prioritize the most recent
+        data for courses that appear in multiple semesters.
+    """
     for subject_code, subject_data in term_data.items():
         for course_num, course_sections in subject_data["courses"].items():
             course_code = f"{subject_code} {course_num}"
@@ -300,6 +307,27 @@ def main(
     restriction_code_name_map_path: Path | str,
     subject_code_name_map_path: Path | str,
 ) -> None:
+    """
+    Runs the JSON to SQL conversion process: initializes the database connection,
+    processes each term's data, and commits the resulting models to the database.
+
+    @param processed_data_dir: Directory containing the processed JSON files.
+    @param db_dialect: Database dialect (e.g., "mysql").
+    @param db_api: Database API (e.g., "mysqlconnector").
+    @param db_hostname: Database hostname (e.g., "localhost:3306").
+    @param db_username: Database username.
+    @param db_password: Database password.
+    @param db_schema: Database schema name.
+    @param attribute_code_name_map_path: Path to JSON file mapping attribute codes to
+        names.
+    @param instructor_rcsid_name_map_path: Path to JSON file mapping instructor RCSIDs to
+        names.
+    @param generated_instructor_rcsid_name_map_path: Path to JSON file mapping generated
+        nstructor RCSIDs to names.
+    @param restriction_code_name_map_path: Path to JSON file mapping restriction codes to
+        names.
+    @param subject_code_name_map_path: Path to JSON file mapping subject codes to names.
+    """
     # Convert to Path objects if needed
     processed_data_dir = Path(processed_data_dir)
     attribute_code_name_map_path = Path(attribute_code_name_map_path)

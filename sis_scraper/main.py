@@ -76,15 +76,17 @@ if __name__ == "__main__":
     init_logging(logs_dir, log_level=logging.INFO)
 
     if args.command == "scrape":
-        asyncio.run(
+        if not asyncio.run(
             sis_scraper.main(
                 output_data_dir=output_data_dir,
                 start_year=args.start_year,
                 end_year=args.end_year,
             )
-        )
+        ):
+            sys.exit(1)
+
     elif args.command == "postprocess":
-        postprocess.main(
+        if not postprocess.main(
             output_data_dir=output_data_dir,
             processed_output_data_dir=processed_data_dir,
             attribute_code_name_map_path=attribute_code_name_map_path,
@@ -92,7 +94,9 @@ if __name__ == "__main__":
             instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
             restriction_code_name_map_path=restriction_code_name_map_path,
             subject_code_name_map_path=subject_code_name_map_path,
-        )
+        ):
+            sys.exit(1)
+
     elif args.command == "commitdb":
         db_dialect = os.getenv("DB_DIALECT")
         db_api = os.getenv("DB_API")
@@ -100,7 +104,6 @@ if __name__ == "__main__":
         db_username = os.getenv("DB_USERNAME")
         db_password = os.getenv("DB_PASSWORD")
         db_schema = os.getenv("DB_SCHEMA")
-
         if not all(
             [db_dialect, db_api, db_hostname, db_username, db_password, db_schema]
         ):
@@ -109,7 +112,6 @@ if __name__ == "__main__":
                 "Ensure all required DB variables are set in the .env file."
             )
             sys.exit(1)
-
         json_to_sql.main(
             processed_data_dir=processed_data_dir,
             db_dialect=db_dialect,

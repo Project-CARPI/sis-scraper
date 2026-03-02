@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import carpi_data_model.models as models
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 

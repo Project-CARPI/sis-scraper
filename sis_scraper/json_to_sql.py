@@ -155,7 +155,7 @@ def process_term(
                     title=main_section["title"],
                     desc_text=main_section["description"],
                     credit_min=main_section["creditMin"],
-                    credit_max=main_section["creditMax"],
+                    credit_max=main_section["creditMax"] or main_section["creditMin"],
                 )
             )
             # Add course attribute models

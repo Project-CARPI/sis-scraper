@@ -191,11 +191,12 @@ class CodeMapper:
 
 
 def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper):
+    # Process subjects first to ensure codes are available for crosslist/coreq processing
     for subject_code, subject_data in term_data.items():
-        # Update Subject Map
         if "subjectDescription" in subject_data:
             mapper.add_subject(subject_code, subject_data["subjectDescription"])
 
+    for subject_code, subject_data in term_data.items():
         if "courses" not in subject_data:
             logger.warning(
                 f"No courses found for subject {subject_code} in term {term}"

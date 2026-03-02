@@ -58,7 +58,7 @@ def html_unescape(obj: Any) -> Any:
     structure (dicts, lists, tuples, sets). Dictionary keys are unescaped too.
 
     @param obj: The object to unescape, which can be a string, dict, list, tuple, etc.
-    @return: The same structure with all string values unescaped.
+    @return: The same object with all string values unescaped.
     """
     if isinstance(obj, str):
         return html.unescape(obj)

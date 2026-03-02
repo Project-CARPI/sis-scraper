@@ -55,20 +55,18 @@ def get_term_code(year: str | int, season: str) -> str:
 
 async def process_class_details(
     session: aiohttp.ClientSession,
-    term_course_data: dict[str, Any],
     term_crn_set: set[str],
     sis_class_entry: dict[str, Any] | None = None,
     term: str | None = None,
     crn: str | None = None,
-) -> None:
+) -> tuple[str, str, dict[str, Any]] | None:
     """
-    Fetches and parses all details for a given class, populating the provided
-    course data dictionary or adding to existing entries as appropriate.
+    Fetches and parses all details for a given class. Returns a tuple containing
+    the subject description, course number, and the fully populated class entry.
 
     Takes as input class data fetched from SIS's class search endpoint.
 
     @param session: aiohttp client session to use for requests.
-    @param term_course_data: Term course data dictionary to populate with class data.
     @param term_crn_set: Set of all CRNs processed in the term.
     @param sis_class_entry: Class data fetched from SIS's class search
             endpoint.
@@ -76,14 +74,15 @@ async def process_class_details(
         sis_class_entry is not provided.
     @param crn: CRN of the class to fetch details for. Required if
         sis_class_entry is not provided.
-    @return: None
+    @return: A tuple of (subject description, course number, class entry data),
+        or None on error.
     """
     if sis_class_entry is None and (term is None or crn is None):
         logger.error(
             "Either sis_class_entry or both term and crn must be provided "
             "to process_class_details"
         )
-        return
+        return None
 
     # Extract basic class details from SIS class entry if provided
     if sis_class_entry is not None:
@@ -187,21 +186,13 @@ async def process_class_details(
         class_entry["waitlistRegistered"] = enrollment_data["waitlistActual"]
         class_entry["waitlistAvailable"] = enrollment_data["waitlistAvailable"]
 
-    # Get appropriate subject course data dictionary from term course data
-    subj_course_data = term_course_data[subject_desc]["courses"]
-    # Initialize course entry if not already present
-    if course_num not in subj_course_data:
-        subj_course_data[course_num] = []
-
-    # Add class entry to subject course data
-    subj_course_data[course_num].append(class_entry)
+    # Return the subject description, course number, and populated class entry
+    return subject_desc, course_num, class_entry
 
 
 async def get_subject_course_data(
     term: str,
     subject_code: str,
-    subject_desc: str,
-    term_course_data: dict[str, dict[str, Any]],
     term_crn_set: set[str],
     semaphore: asyncio.Semaphore = asyncio.Semaphore(1),
     tcp_connector: aiohttp.TCPConnector = None,
@@ -216,8 +207,6 @@ async def get_subject_course_data(
     @param term: Term code to fetch data for.
     @param subject_code: Subject code to fetch data for, e.g. "CSCI".
     @param subject_desc: Subject description, e.g. "Computer Science".
-    @param term_course_data: Term course data dictionary to populate with subject
-        course data.
     @param term_crn_set: Set of all CRNs processed in the term.
     @param semaphore: Semaphore to limit number of concurrent sessions between
         multiple calls to this function.
@@ -241,27 +230,40 @@ async def get_subject_course_data(
                         f"No classes found for subject {subject_code} in term {term}"
                     )
                     return {}
+
                 # Process class entries from the class search in parallel
+                tasks: list[asyncio.Task] = []
                 async with asyncio.TaskGroup() as tg:
                     for sis_class_entry in sis_class_data:
-                        tg.create_task(
+                        task = tg.create_task(
                             process_class_details(
                                 session,
-                                term_course_data,
                                 term_crn_set,
                                 sis_class_entry,
                             )
                         )
-                # Get subject course data from term course data
-                subj_course_data = term_course_data[subject_desc]["courses"]
+                        tasks.append(task)
+
+                # Build subject course data
+                subj_course_data = {}
+                for task in tasks:
+                    result = task.result()
+                    if result:
+                        _, course_num, class_entry = result
+                        if course_num not in subj_course_data:
+                            subj_course_data[course_num] = []
+                        subj_course_data[course_num].append(class_entry)
+
                 # Sort class entries by section number
                 for course_num in subj_course_data:
                     subj_course_data[course_num] = sorted(
                         subj_course_data[course_num],
                         key=lambda class_entry: class_entry["sectionNumber"],
                     )
+
                 # Return data sorted by course code
                 return dict(sorted(subj_course_data.items()))
+
             except aiohttp.ClientError as e:
                 logger.error(
                     f"Error processing subject {subject_code} in term {term}: {e}"
@@ -324,8 +326,6 @@ async def get_term_course_data(
                     get_subject_course_data(
                         term,
                         subject_code,
-                        subject_desc,
-                        term_course_data,
                         term_crn_set,
                         semaphore=semaphore,
                         tcp_connector=tcp_connector,
@@ -365,20 +365,35 @@ async def get_term_course_data(
                 if crosslist["courseReferenceNumber"] not in term_crn_set
             }
             if len(hidden_crns) > 0:
+                hidden_class_tasks = []
                 async with asyncio.TaskGroup() as tg:
                     for crn in hidden_crns:
-                        tg.create_task(
+                        task = tg.create_task(
                             process_class_details(
                                 session,
-                                term_course_data,
                                 term_crn_set,
                                 term=term,
                                 crn=crn,
                             )
                         )
+                        hidden_class_tasks.append(task)
                         logger.info(
                             f"Processing hidden class with CRN {crn} in term {term}"
                         )
+                for task in hidden_class_tasks:
+                    result = task.result()
+                    if result:
+                        subject_desc, course_num, class_entry = result
+                        if subject_desc in term_course_data:
+                            subj_course_data = term_course_data[subject_desc]["courses"]
+                            if course_num not in subj_course_data:
+                                subj_course_data[course_num] = []
+                            subj_course_data[course_num].append(class_entry)
+                        else:
+                            logger.warning(
+                                f"Subject {subject_desc} not found in term_course_data"
+                                f"for CRN {class_entry['courseReferenceNumber']}"
+                            )
 
     # Convert term course data to be keyed by subject code instead of description
     term_course_data_by_code = {}

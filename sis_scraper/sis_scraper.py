@@ -20,7 +20,7 @@ from sis_api import (
     get_class_prerequisites,
     get_class_restrictions,
     get_term_subjects,
-    init_class_search,
+    reset_class_search,
 )
 
 logger = logging.getLogger(__name__)

@@ -762,7 +762,7 @@ async def get_class_faculty_meetings(
         "faculty": [
             {
                 "bannerId": "123456",
-                "displayName": "Last, First",
+                "displayName": "Last First",
                 "emailAddress": "example@rpi.edu",
                 "allMeetings": [1, 2, ...],
                 "primaryMeetings": [1, ...]

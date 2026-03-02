@@ -386,12 +386,9 @@ def main(
     # Insert course data into the database
     db_manager.commit_all(course)
     db_manager.commit_all(
-        course_attribute,
-        course_relationship,
-        course_restriction,
-        course_offering,
-        course_faculty,
+        course_attribute, course_relationship, course_restriction, course_offering
     )
+    db_manager.commit_all(course_faculty)
 
     db_manager.close_connection()
 

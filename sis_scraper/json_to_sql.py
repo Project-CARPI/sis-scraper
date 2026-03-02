@@ -389,7 +389,7 @@ def main(
     @param instructor_rcsid_name_map_path: Path to JSON file mapping instructor RCSIDs to
         names.
     @param generated_instructor_rcsid_name_map_path: Path to JSON file mapping generated
-        nstructor RCSIDs to names.
+        instructor RCSIDs to names.
     @param restriction_code_name_map_path: Path to JSON file mapping restriction codes to
         names.
     @param subject_code_name_map_path: Path to JSON file mapping subject codes to names.

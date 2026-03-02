@@ -141,10 +141,11 @@ def process_term(
 ) -> None:
     for subject_code, subject_data in term_data.items():
         for course_num, course_sections in subject_data["courses"].items():
+            course_code = f"{subject_code} {course_num}"
             # Skip if this course has already been processed in a later semester
-            if f"{subject_code} {course_num}" in processed_courses:
+            if course_code in processed_courses:
                 continue
-            processed_courses.add(f"{subject_code} {course_num}")
+            processed_courses.add(course_code)
             # Use the first section's data to represent course-level information
             main_section = course_sections[0]
             # Add course model
@@ -189,10 +190,11 @@ def process_term(
                         subj_code=subject_code,
                         code_num=course_num,
                         relationship=models.RelationshipTypeEnum.CROSSLIST,
-                        rel_subj=cross.split(" ")[0],
-                        rel_code_num=cross.split(" ")[1],
+                        rel_subj=crosslist.split(" ")[0],
+                        rel_code_num=crosslist.split(" ")[1],
                     )
-                    for cross in main_section["crosslists"]
+                    # Some classes may have duplicate crosslist entries
+                    for crosslist in set(main_section["crosslists"])
                 ]
             )
             # Add course restriction models
@@ -391,56 +393,3 @@ def main(
     db_manager.commit_all(course_faculty)
 
     db_manager.close_connection()
-
-
-if __name__ == "__main__":
-    import os
-
-    from dotenv import load_dotenv
-
-    load_dotenv()
-    processed_data_dir = Path(__file__).parent / os.getenv(
-        "SCRAPER_PROCESSED_OUTPUT_DATA_DIR"
-    )
-    output_data_dir = Path(__file__).parent / os.getenv("SCRAPER_RAW_OUTPUT_DATA_DIR")
-    processed_data_dir = Path(__file__).parent / os.getenv(
-        "SCRAPER_PROCESSED_OUTPUT_DATA_DIR"
-    )
-    code_maps_dir = Path(__file__).parent / os.getenv("SCRAPER_CODE_MAPS_DIR")
-    attribute_code_name_map_path = code_maps_dir / os.getenv(
-        "ATTRIBUTE_CODE_NAME_MAP_FILENAME"
-    )
-    instructor_rcsid_name_map_path = code_maps_dir / os.getenv(
-        "INSTRUCTOR_RCSID_NAME_MAP_FILENAME"
-    )
-    generated_instructor_rcsid_name_map_path = (
-        code_maps_dir / "generated_instructor_rcsid_name_map.json"
-    )
-    restriction_code_name_map_path = code_maps_dir / os.getenv(
-        "RESTRICTION_CODE_NAME_MAP_FILENAME"
-    )
-    subject_code_name_map_path = code_maps_dir / os.getenv(
-        "SUBJECT_CODE_NAME_MAP_FILENAME"
-    )
-
-    db_dialect = os.getenv("DB_DIALECT")
-    db_api = os.getenv("DB_API")
-    db_hostname = os.getenv("DB_HOSTNAME")
-    db_username = os.getenv("DB_USERNAME")
-    db_password = os.getenv("DB_PASSWORD")
-    db_schema = os.getenv("DB_SCHEMA")
-
-    main(
-        processed_data_dir=processed_data_dir,
-        db_dialect=db_dialect,
-        db_api=db_api,
-        db_hostname=db_hostname,
-        db_username=db_username,
-        db_password=db_password,
-        db_schema=db_schema,
-        attribute_code_name_map_path=attribute_code_name_map_path,
-        instructor_rcsid_name_map_path=instructor_rcsid_name_map_path,
-        generated_instructor_rcsid_name_map_path=generated_instructor_rcsid_name_map_path,
-        restriction_code_name_map_path=restriction_code_name_map_path,
-        subject_code_name_map_path=subject_code_name_map_path,
-    )

@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class CodeMapper:
+    """
+    Manages mappings between codes and names for subjects, attributes, restrictions, and
+    instructors. Provides methods to load existing mappings from JSON files, update
+    mappings with new data, and save updated mappings back to JSON files, among some
+    other utility functions.
+    """
+
     def __init__(
         self,
         attribute_path: Path | str,
@@ -44,6 +51,11 @@ class CodeMapper:
         }
 
     def _normalize_restrictions(self) -> None:
+        """
+        Normalizes restriction codes by stripping "not_" prefix from restriction types,
+        such that "not_major" and "major" restrictions with the same code will be treated
+        as the same restriction type with that code.
+        """
         normalized = {}
         for r_type, codes in self.restrictions.items():
             target_type = r_type
@@ -56,6 +68,13 @@ class CodeMapper:
         self.restrictions = normalized
 
     def _load_json(self, path: Path | str) -> dict:
+        """
+        Helper function to load a JSON file.
+
+        @param path: Path to the JSON file to load.
+        @return: Dictionary containing the loaded JSON data, or an empty dictionary if \
+            the file does not exist or is a directory.
+        """
         path = Path(path)
         if path.exists() and not path.is_dir():
             try:
@@ -66,14 +85,14 @@ class CodeMapper:
                 logger.error(f"Error decoding JSON from {path}: {e}")
         return {}
 
-    def save(self) -> None:
-        self._save_json(self.attribute_path, self.attributes)
-        self._save_json(self.generated_instructor_path, self.generated_instructors)
-        self._save_json(self.instructor_path, self.instructors)
-        self._save_json(self.restriction_path, self.restrictions)
-        self._save_json(self.subject_path, self.subjects)
-
     def _save_json(self, path: Path, data: dict) -> None:
+        """
+        Helper function to save a dictionary to a JSON file. Existing files will be
+        overwritten with the updated mappings. Keys are sorted for consistent output.
+
+        @param path: Path to the JSON file to save.
+        @param data: Dictionary containing the data to save to JSON.
+        """
         # Sort keys for consistent output
         sorted_data = dict(sorted(data.items()))
         # For nested dicts (restrictions), sort inner keys too
@@ -84,7 +103,26 @@ class CodeMapper:
         with path.open("w", encoding="utf-8") as f:
             json.dump(sorted_data, f, indent=4, ensure_ascii=False)
 
+    def save(self) -> None:
+        """
+        Saves the current mappings to their respective JSON files. Existing files will be
+        overwritten with the updated mappings. Keys are sorted for consistent output.
+        """
+        self._save_json(self.attribute_path, self.attributes)
+        self._save_json(self.generated_instructor_path, self.generated_instructors)
+        self._save_json(self.instructor_path, self.instructors)
+        self._save_json(self.restriction_path, self.restrictions)
+        self._save_json(self.subject_path, self.subjects)
+
     def add_subject(self, code: str, name: str) -> None:
+        """
+        Adds a subject code to name mapping, logging a warning if a conflicting name is
+        found for an existing code. The mapping will be updated with the new name in any
+        case, to ensure the most recent name is used for each code.
+
+        @param code: Subject code to add.
+        @param name: Subject name to add.
+        """
         if code in self.subjects and self.subjects[code] != name:
             logging.warning(
                 f"Conflicting subject name for code {code}: "
@@ -95,6 +133,14 @@ class CodeMapper:
         self.subject_name_to_code[name] = code
 
     def add_attribute(self, code: str, name: str) -> None:
+        """
+        Adds an attribute code to name mapping, logging a warning if a conflicting name is
+        found for an existing code. The mapping will be updated with the new name in any
+        case, to ensure the most recent name is used for each code.
+
+        @param code: Attribute code to add.
+        @param name: Attribute name to add.
+        """
         if code in self.attributes and self.attributes[code] != name:
             logging.warning(
                 f"Conflicting attribute name for code {code}: "
@@ -104,6 +150,20 @@ class CodeMapper:
         self.attributes[code] = name
 
     def add_restriction(self, r_type: str, code: str, name: str) -> None:
+        """
+        Adds a restriction code to name mapping under the given restriction type, logging
+        a warning if a conflicting name is found for an existing code. The mapping will be
+        updated with the new name in any case, to ensure the most recent name is used for
+        each code.
+
+        Restriction types will be normalized by stripping "not_" prefix, such that
+        "not_major" and "major" restrictions with the same code will be treated as the
+        same restriction type with that code.
+
+        @param r_type: Restriction type (e.g. "major", "not_major") to add the code under.
+        @param code: Restriction code to add.
+        @param name: Restriction name to add.
+        """
         if r_type.startswith("not_"):
             r_type = r_type[4:]
         if r_type not in self.restrictions:
@@ -120,6 +180,15 @@ class CodeMapper:
         self.restrictions[r_type][code] = name.strip()
 
     def add_instructor(self, rcsid: str, name: str, email: str) -> None:
+        """
+        Adds an instructor RCSID to name mapping, logging a warning if conflicting data is
+        found for an existing RCSID. The mapping will be updated with the new data in any
+        case, to ensure the most recent data is used for each RCSID.
+
+        @param rcsid: Instructor RCSID to add.
+        @param name: Instructor name to add.
+        @param email: Instructor email to add.
+        """
         if rcsid in self.instructors and self.instructors[rcsid] != (name, email):
             logging.warning(
                 f"Conflicting data for RCSID {rcsid}: "
@@ -131,6 +200,16 @@ class CodeMapper:
         self.instructors[rcsid] = (name, email)
 
     def add_generated_instructor(self, rcsid: str, name: str, email: str) -> None:
+        """
+        Adds a generated instructor RCSID to name mapping, logging a warning if
+        conflicting data is found for an existing generated RCSID. The mapping will be
+        updated with the new data in any case, to ensure the most recent data is used for
+        each generated RCSID.
+
+        @param rcsid: Generated instructor RCSID to add.
+        @param name: Generated instructor name to add.
+        @param email: Generated instructor email to add.
+        """
         if rcsid in self.generated_instructors and self.generated_instructors[
             rcsid
         ] != (name, email):
@@ -146,16 +225,41 @@ class CodeMapper:
         self.generated_instructor_name_to_rcsid[name] = rcsid
 
     def get_subject_code(self, name: str) -> str | None:
+        """
+        Returns the subject code for a given subject name, or None if the name is not
+        found.
+
+        @param name: Subject name to look up.
+        @return: Subject code corresponding to the given name, or None if not found.
+        """
         if name in self.subject_name_to_code:
             return self.subject_name_to_code[name]
         return None
 
     def get_generated_rcsid(self, name: str) -> str | None:
+        """
+        Returns the generated instructor RCSID for a given instructor name, or None if the
+        name is not found.
+
+        @param name: Instructor name to look up.
+        @return: Generated instructor RCSID corresponding to the given name, or None if \
+            not found.
+        """
         if name in self.generated_instructor_name_to_rcsid:
             return self.generated_instructor_name_to_rcsid[name]
         return None
 
     def generate_rcsid(self, instructor_name: str) -> str:
+        """
+        Generates a unique RCSID for an instructor based on their name, following the
+        format of the first 5 characters of their last name (stripping non-alphabetic
+        characters) plus the first initial of their first name, all lowercased. If the
+        generated RCSID already exists, a counter is appended to ensure uniqueness.
+
+        @param instructor_name: Instructor name to generate an RCSID for, in "Last First"
+            format.
+        @return: Generated unique RCSID for the instructor.
+        """
         # Assume instructor name is in "Last First" format
         # Some names have more than two parts, but we will only consider the first two
         instructor_name_split = instructor_name.split()
@@ -190,7 +294,17 @@ class CodeMapper:
         return rcsid
 
 
-def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper):
+def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> None:
+    """
+    Processes the course data for a single term, codifying subject codes, attribute codes,
+    restriction codes, and instructor RCSIDs, and updating the provided CodeMapper with
+    any new mappings found during processing.
+
+    @param term: Term identifier (e.g. "2023FA") for logging purposes.
+    @param term_data: Dictionary containing the raw course data for the term, structured
+        as loaded from the raw output JSON files.
+    @param mapper: CodeMapper instance to use for managing code mappings and lookups.
+    """
     # Process subjects first to ensure codes are available for crosslist/coreq processing
     for subject_code, subject_data in term_data.items():
         if "subjectDescription" in subject_data:
@@ -294,6 +408,20 @@ def main(
     Runs post-processing on the raw output data from the SIS scraper. This includes
     codifying course codes, attributes, restrictions, and instructor RCSIDs,
     and updating the code mappings.
+
+    @param output_data_dir: Directory containing the raw output JSON files from scraping.
+    @param processed_output_data_dir: Directory to write the processed JSON files to.
+    @param attribute_code_name_map_path: Path to the JSON file containing the attribute
+        code to name mapping.
+    @param generated_instructor_rcsid_name_map_path: Path to the JSON file containing the
+        generated instructor RCSID to name mapping.
+    @param instructor_rcsid_name_map_path: Path to the JSON file containing the instructor
+        RCSID to name mapping.
+    @param restriction_code_name_map_path: Path to the JSON file containing the
+        restriction code to name mapping.
+    @param subject_code_name_map_path: Path to the JSON file containing the subject code
+        to name mapping.
+    @return: True if post-processing completed successfully, False otherwise.
     """
     # Convert to Path objects
     output_data_dir = Path(output_data_dir)

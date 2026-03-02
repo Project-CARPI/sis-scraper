@@ -72,9 +72,11 @@ def html_unescape(obj: Any) -> Any:
         f"Retrying failed request (attempt {retry_state.attempt_number}) "
         f"for URL: {getattr(retry_state.args[1], 'url', retry_state.args[1])} "
         f"with params: {retry_state.args[2]} | "
-        f"Exception: {retry_state.outcome.exception()}"
-        if retry_state.outcome and retry_state.outcome.exception()
-        else "Unknown"
+        f"Exception: {
+            repr(retry_state.outcome.exception())
+            if retry_state.outcome and retry_state.outcome.exception()
+            else 'Unknown'
+        }"
     ),
 )
 async def retry_get(

@@ -392,6 +392,14 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                             subj_name = item["subjectName"]
                             course_num = item["courseNumber"]
                             subj_code = mapper.get_subject_code(subj_name)
+                            # Fallback to subject name if code mapping not found
+                            if subj_code is None:
+                                logger.warning(
+                                    f"Subject name '{subj_name}' not found in mapping "
+                                    f"for CRN {class_entry['courseReferenceNumber']} "
+                                    f"in term {term}"
+                                )
+                                subj_code = subj_name
                             new_list.append(f"{subj_code} {course_num}")
                         class_entry[field] = new_list
 

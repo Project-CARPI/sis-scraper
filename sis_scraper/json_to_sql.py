@@ -167,8 +167,10 @@ def load_code_mappings(
     dictionary.
 
     @param attribute_code_name_map_path: Path to the attribute code mapping JSON file.
-    @param instructor_rcsid_name_map_path: Path to the instructor RCID name mapping JSON file.
-    @param generated_instructor_rcsid_name_map_path: Path to the generated instructor RCID name mapping JSON file.
+    @param instructor_rcsid_name_map_path: Path to the instructor RCID name mapping JSON
+        file.
+    @param generated_instructor_rcsid_name_map_path: Path to the generated instructor RCID
+        name mapping JSON file.
     @param restriction_code_name_map_path: Path to the restriction code mapping JSON file.
     @param subject_code_name_map_path: Path to the subject code mapping JSON file.
     @return: Dictionary representing the combined code mappings.

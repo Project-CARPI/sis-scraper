@@ -427,9 +427,9 @@ def main(
 
         # Reset database schema
         db_manager.drop_all_tables()
-        logger.info("Dropped all existing tables in the database.")
+        logger.info("Dropped all existing tables in the database")
         db_manager.generate_schema()
-        logger.info("Generated database schema based on models.")
+        logger.info("Generated database schema based on models")
 
         # Load and insert code mappings first since other tables depend on them
         code_mappings = load_code_mappings(

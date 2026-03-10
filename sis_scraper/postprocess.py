@@ -443,8 +443,11 @@ def main(
     restriction_code_name_map_path = Path(restriction_code_name_map_path)
     subject_code_name_map_path = Path(subject_code_name_map_path)
 
-    if not output_data_dir.exists():
-        logger.error(f"Output data directory {output_data_dir} does not exist.")
+    if not output_data_dir.exists() or not output_data_dir.is_dir():
+        logger.error(
+            f"Output data directory {output_data_dir} "
+            f"does not exist or is not a directory."
+        )
         return False
 
     # Initialize code mapper

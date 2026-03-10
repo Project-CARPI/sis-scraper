@@ -80,14 +80,14 @@ class DatabaseManager:
         """
         models.Base.metadata.drop_all(self._engine)
 
-    def commit_all(self, *models: list[models.Base]) -> None:
+    def commit_all(self, *model_lists: list[models.Base]) -> None:
         """
         Commits all provided models to the database in a single transaction.
 
-        @param models: Variable number of lists of model instances to commit.
+        @param model_lists: Variable number of lists of model instances to commit.
         """
         with self._session_factory() as session:
-            for model_list in models:
+            for model_list in model_lists:
                 session.add_all(model_list)
                 session.flush()
             session.commit()

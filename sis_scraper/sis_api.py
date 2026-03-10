@@ -805,7 +805,7 @@ async def get_class_faculty_meetings(
     session: aiohttp.ClientSession,
     term: str,
     crn: str,
-) -> list[dict[str, Any]]:
+) -> dict[str, list[dict[str, Any]]]:
     """
     Fetches and parses data from the "Instructor/Meeting Times" tab of a class details
     page.
@@ -863,7 +863,7 @@ def _process_class_faculty_meetings(
     sis_faculty_meetings_list: list[dict[str, Any]],
     term: str,
     crn: str,
-) -> list[dict[str, Any]]:
+) -> dict[str, list[dict[str, Any]]]:
     """
     Processes raw class meeting data from SIS into a more usable format.
 

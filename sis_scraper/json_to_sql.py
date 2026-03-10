@@ -250,12 +250,40 @@ def process_term(
     for subject_code, subject_data in term_data.items():
         for course_num, course_sections in subject_data["courses"].items():
             course_code = f"{subject_code} {course_num}"
-            # Skip if this course has already been processed in a later semester
+            # Use the first section's data to represent course-level information
+            main_section = course_sections[0]
+            # Add course offering models
+            seats_total = 0
+            seats_filled = 0
+            for section in course_sections:
+                seats_total += section["seatsCapacity"]
+                seats_filled += section["seatsRegistered"]
+            course_offering_models.append(
+                models.Course_Offering(
+                    sem_year=year,
+                    semester=semester,
+                    subj_code=subject_code,
+                    code_num=course_num,
+                    seats_total=seats_total,
+                    seats_filled=seats_filled,
+                )
+            )
+            # Add course faculty models
+            for faculty in main_section["faculty"]:
+                course_faculty_models.append(
+                    models.Course_Faculty(
+                        sem_year=year,
+                        semester=semester,
+                        subj_code=subject_code,
+                        code_num=course_num,
+                        rcsid=faculty["rcsid"],
+                    )
+                )
+            # Skip semester-agnostic model generation if this course has already been
+            # processed in a later semester
             if course_code in processed_courses:
                 continue
             processed_courses.add(course_code)
-            # Use the first section's data to represent course-level information
-            main_section = course_sections[0]
             # Add course model
             course_models.append(
                 models.Course(
@@ -329,33 +357,6 @@ def process_term(
                         )
                         for restr_code in restriction_values
                     ]
-                )
-            # Add course offering models
-            seats_total = 0
-            seats_filled = 0
-            for section in course_sections:
-                seats_total += section["seatsCapacity"]
-                seats_filled += section["seatsRegistered"]
-            course_offering_models.append(
-                models.Course_Offering(
-                    sem_year=year,
-                    semester=semester,
-                    subj_code=subject_code,
-                    code_num=course_num,
-                    seats_total=seats_total,
-                    seats_filled=seats_filled,
-                )
-            )
-            # Add course faculty models
-            for faculty in main_section["faculty"]:
-                course_faculty_models.append(
-                    models.Course_Faculty(
-                        sem_year=year,
-                        semester=semester,
-                        subj_code=subject_code,
-                        code_num=course_num,
-                        rcsid=faculty["rcsid"],
-                    )
                 )
 
 

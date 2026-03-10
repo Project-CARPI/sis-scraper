@@ -261,7 +261,7 @@ async def get_subject_course_data(
     term: str,
     subject_code: str,
     term_crn_set: set[str],
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(1),
+    semaphore: asyncio.Semaphore = None,
     tcp_connector: aiohttp.TCPConnector = None,
     timeout: int = 30,
 ) -> dict[str, dict[str, Any]]:
@@ -281,6 +281,10 @@ async def get_subject_course_data(
     @param timeout: Timeout in seconds for all requests made by a session.
     @return: Dictionary of course data keyed by course code.
     """
+    # Create default semaphore if not provided
+    if semaphore is None:
+        semaphore = asyncio.Semaphore(1)
+
     async with semaphore:
         timeout_obj = aiohttp.ClientTimeout(total=timeout)
 

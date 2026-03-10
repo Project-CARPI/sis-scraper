@@ -125,7 +125,7 @@ class CodeMapper:
         @param name: Subject name to add.
         """
         if code in self.subjects and self.subjects[code] != name:
-            logging.warning(
+            logger.warning(
                 f"Conflicting subject name for code {code}: "
                 f"'{self.subjects[code]}' vs '{name}'"
             )
@@ -143,7 +143,7 @@ class CodeMapper:
         @param name: Attribute name to add.
         """
         if code in self.attributes and self.attributes[code] != name:
-            logging.warning(
+            logger.warning(
                 f"Conflicting attribute name for code {code}: "
                 f"'{self.attributes[code]}' vs '{name}'"
             )
@@ -173,7 +173,7 @@ class CodeMapper:
             code in self.restrictions[r_type]
             and self.restrictions[r_type][code] != name
         ):
-            logging.warning(
+            logger.warning(
                 f"Conflicting restriction name for type {r_type} code {code}: "
                 f"'{self.restrictions[r_type][code]}' vs '{name}'"
             )
@@ -191,7 +191,7 @@ class CodeMapper:
         @param email: Instructor email to add.
         """
         if rcsid in self.instructors and self.instructors[rcsid] != (name, email):
-            logging.warning(
+            logger.warning(
                 f"Conflicting data for RCSID {rcsid}: "
                 f"existing name '{self.instructors[rcsid][0]}', "
                 f"email '{self.instructors[rcsid][1]}' vs. "
@@ -214,7 +214,7 @@ class CodeMapper:
         if rcsid in self.generated_instructors and self.generated_instructors[
             rcsid
         ] != (name, email):
-            logging.warning(
+            logger.warning(
                 f"Conflicting data for generated RCSID {rcsid}: "
                 f"existing name '{self.generated_instructors[rcsid][0]}', "
                 f"email '{self.generated_instructors[rcsid][1]}' vs. "

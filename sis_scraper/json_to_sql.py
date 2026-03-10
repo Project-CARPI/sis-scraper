@@ -137,6 +137,10 @@ def get_semester_info_from_filename(file_path: Path) -> tuple[int, str]:
             semester = "SUMMER"
         case "09":
             semester = "FALL"
+        case _:
+            raise ValueError(
+                f"Invalid semester code '{semester_code}' in filename '{file_path.name}'"
+            )
     return year, semester
 
 

@@ -56,7 +56,7 @@ def get_term_code(year: str | int, season: str) -> str:
 
 def write_json(json_data: dict[str, Any], output_path: Path | str) -> None:
     """
-    Helper function to write JSON data to a file with error handling.
+    Helper function to write JSON data to a file.
 
     @param json_data: The JSON data to write to the file.
     @param output_path: The path to the file to write the JSON data to.

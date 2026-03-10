@@ -14,7 +14,7 @@ from logging_config import init_logging
 if __name__ == "__main__":
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
-        description="Scrape and process course data from the RPI Student Information"
+        description="Scrape and process course data from the RPI Student Information "
         "System (SIS)."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

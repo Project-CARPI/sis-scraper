@@ -273,7 +273,6 @@ async def get_subject_course_data(
 
     @param term: Term code to fetch data for.
     @param subject_code: Subject code to fetch data for, e.g. "CSCI".
-    @param subject_desc: Subject description, e.g. "Computer Science".
     @param term_crn_set: Set of all CRNs processed in the term.
     @param semaphore: Semaphore to limit number of concurrent sessions between
         multiple calls to this function.

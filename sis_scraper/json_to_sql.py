@@ -193,7 +193,7 @@ def load_code_mappings(
             rcsid=rcsid,
             # Assume first name is everything after the first space
             first_name=" ".join(name.split()[1:]).strip(),
-            last_name=name.split()[0].strip(),
+            last_name=name.split()[0].strip().strip(","),
         )
         for rcsid, [name, _] in (faculty_data | generated_faculty_data).items()
     ]

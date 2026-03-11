@@ -115,7 +115,7 @@ async def get_term_subjects(
     term is invalid or doesn't exist, returns an empty list.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term code to fetch subjects for (e.g. "202410" for Fall 2024).
+    @param term: The term code to fetch subjects for (e.g. "202409" for Fall 2024).
     @return: A list of dictionaries in the following format:
     ```
     [
@@ -143,7 +143,7 @@ async def get_term_instructors(
     invalid or doesn't exist, returns an empty list.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term code to fetch instructors for (e.g. "202410" for Fall 2024).
+    @param term: The term code to fetch instructors for (e.g. "202409" for Fall 2024).
     @return: A list of dictionaries in the following format:
     ```
     [

@@ -205,8 +205,8 @@ async def resolve_hidden_classes(
     term: str,
     term_course_data: dict[str, dict[str, Any]],
     term_crn_set: set[str],
-    semaphore: asyncio.Semaphore,
-    tcp_connector: aiohttp.TCPConnector = None,
+    semaphore: asyncio.Semaphore | None = None,
+    tcp_connector: aiohttp.TCPConnector | None = None,
     timeout: int = 30,
 ) -> list[tuple[str, str, dict[str, Any]]]:
     """
@@ -216,7 +216,7 @@ async def resolve_hidden_classes(
     @param term: Term code to fetch hidden classes for.
     @param term_course_data: The current term course data to check for hidden classes.
     @param term_crn_set: Set of all CRNs processed in the term.
-    @param semaphore: Semaphore to limit number of concurrent sessions between
+    @param semaphore: Optional semaphore to limit number of concurrent sessions between
         multiple calls to this function.
     @param tcp_connector: Optional TCP connector to use for client sessions. If not
         provided, sessions will use a default connector.
@@ -224,6 +224,10 @@ async def resolve_hidden_classes(
     @return: List of tuples containing subject description, course number, and
         class entry data for each hidden class found.
     """
+    # Create default semaphore if not provided
+    if semaphore is None:
+        semaphore = asyncio.Semaphore(1)
+
     async with semaphore:
         timeout_obj = aiohttp.ClientTimeout(total=timeout)
 
@@ -265,8 +269,8 @@ async def get_subject_course_data(
     term: str,
     subject_code: str,
     term_crn_set: set[str],
-    semaphore: asyncio.Semaphore = None,
-    tcp_connector: aiohttp.TCPConnector = None,
+    semaphore: asyncio.Semaphore | None = None,
+    tcp_connector: aiohttp.TCPConnector | None = None,
     timeout: int = 30,
 ) -> dict[str, dict[str, Any]]:
     """
@@ -278,7 +282,7 @@ async def get_subject_course_data(
     @param term: Term code to fetch data for.
     @param subject_code: Subject code to fetch data for, e.g. "CSCI".
     @param term_crn_set: Set of all CRNs processed in the term.
-    @param semaphore: Semaphore to limit number of concurrent sessions between
+    @param semaphore: Optional semaphore to limit number of concurrent sessions between
         multiple calls to this function.
     @param tcp_connector: Optional TCP connector to use for the session. If not
         provided, the session will use a default connector.
@@ -351,8 +355,8 @@ async def get_subject_course_data(
 async def get_term_course_data(
     term: str,
     output_path: Path | str,
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
-    tcp_connector: aiohttp.TCPConnector = None,
+    semaphore: asyncio.Semaphore | None = None,
+    tcp_connector: aiohttp.TCPConnector | None = None,
     timeout: int = 30,
 ) -> bool:
     """
@@ -364,7 +368,7 @@ async def get_term_course_data(
 
     @param term: Term code to fetch data for.
     @param output_path: Path to write term course data JSON file to.
-    @param semaphore: Semaphore to limit number of concurrent sessions.
+    @param semaphore: Optional semaphore to limit number of concurrent sessions.
     @param tcp_connector: Optional TCP connector to use for all sessions. If not
         provided, sessions will use default connectors.
     @param timeout: Timeout in seconds for all requests made by a session.

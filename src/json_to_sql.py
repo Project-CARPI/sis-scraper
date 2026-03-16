@@ -4,6 +4,7 @@ from pathlib import Path
 
 import carpi_data_model.models as models
 from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,8 @@ class DatabaseManager:
         self,
         db_dialect: str,
         db_api: str,
-        db_hostname: str,
+        db_host: str,
+        db_port: int,
         db_username: str,
         db_password: str,
         db_schema: str,
@@ -27,7 +29,8 @@ class DatabaseManager:
     ):
         self._db_dialect = db_dialect
         self._db_api = db_api
-        self._db_hostname = db_hostname
+        self._db_host = db_host
+        self._db_port = db_port
         self._db_username = db_username
         self._db_password = db_password
         self._db_schema = db_schema
@@ -47,7 +50,8 @@ class DatabaseManager:
                 get_db_url(
                     db_dialect=self._db_dialect,
                     db_api=self._db_api,
-                    db_hostname=self._db_hostname,
+                    db_host=self._db_host,
+                    db_port=self._db_port,
                     db_username=self._db_username,
                     db_password=self._db_password,
                     db_schema=self._db_schema,
@@ -96,7 +100,8 @@ class DatabaseManager:
 def get_db_url(
     db_dialect: str,
     db_api: str,
-    db_hostname: str,
+    db_host: str,
+    db_port: int,
     db_username: str,
     db_password: str,
     db_schema: str,
@@ -106,18 +111,24 @@ def get_db_url(
 
     @param db_dialect: Database dialect (e.g., "mysql").
     @param db_api: Database API (e.g., "mysqlconnector").
-    @param db_hostname: Database hostname (e.g., "localhost:3306").
+    @param db_host: Database host (e.g., "localhost").
+    @param db_port: Database port (e.g., 3306).
     @param db_username: Database username.
     @param db_password: Database password.
     @param db_schema: Database schema name.
-    @return: Database URL string in the format: \
+    @return: Database URL object with string format: \
         dialect+api://username:password@hostname/schema
     """
-    return (
-        f"{db_dialect}+{db_api}://"
-        f"{db_username}:{db_password}"
-        f"@{db_hostname}/{db_schema}"
+    drivername = f"{db_dialect}+{db_api}"
+    url = URL.create(
+        drivername=drivername,
+        username=db_username,
+        password=db_password,
+        host=db_host,
+        port=db_port,
+        database=db_schema,
     )
+    return url
 
 
 def get_semester_info_from_filename(file_path: Path) -> tuple[int, str]:
@@ -370,7 +381,8 @@ def main(
     processed_data_dir: Path | str,
     db_dialect: str,
     db_api: str,
-    db_hostname: str,
+    db_host: str,
+    db_port: int,
     db_username: str,
     db_password: str,
     db_schema: str,
@@ -387,7 +399,8 @@ def main(
     @param processed_data_dir: Directory containing the processed JSON files.
     @param db_dialect: Database dialect (e.g., "mysql").
     @param db_api: Database API (e.g., "mysqlconnector").
-    @param db_hostname: Database hostname (e.g., "localhost:3306").
+    @param db_host: Database host (e.g., "localhost").
+    @param db_port: Database port (e.g., 3306).
     @param db_username: Database username.
     @param db_password: Database password.
     @param db_schema: Database schema name.
@@ -417,7 +430,8 @@ def main(
         db_manager = DatabaseManager(
             db_dialect=db_dialect,
             db_api=db_api,
-            db_hostname=db_hostname,
+            db_host=db_host,
+            db_port=db_port,
             db_username=db_username,
             db_password=db_password,
             db_schema=db_schema,
@@ -426,8 +440,16 @@ def main(
         db_manager.init_connection()
         logger.info(
             "Connected to database with URL "
-            + get_db_url(
-                db_dialect, db_api, db_hostname, db_username, "****", db_schema
+            + str(
+                get_db_url(
+                    db_dialect,
+                    db_api,
+                    db_host,
+                    db_port,
+                    db_username,
+                    "***",
+                    db_schema,
+                )
             )
         )
 

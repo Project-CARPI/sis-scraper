@@ -101,12 +101,13 @@ if __name__ == "__main__":
     elif args.command == "commitdb":
         db_dialect = os.getenv("DB_DIALECT")
         db_api = os.getenv("DB_API")
-        db_hostname = os.getenv("DB_HOSTNAME")
+        db_host = os.getenv("DB_HOST")
+        db_port = os.getenv("DB_PORT")
         db_username = os.getenv("DB_USERNAME")
         db_password = os.getenv("DB_PASSWORD")
         db_schema = os.getenv("DB_SCHEMA")
         if not all(
-            [db_dialect, db_api, db_hostname, db_username, db_password, db_schema]
+            [db_dialect, db_api, db_host, db_port, db_username, db_password, db_schema]
         ):
             print(
                 "ERROR: One or more database environment variables are not set. "
@@ -117,7 +118,8 @@ if __name__ == "__main__":
             processed_data_dir=processed_data_dir,
             db_dialect=db_dialect,
             db_api=db_api,
-            db_hostname=db_hostname,
+            db_host=db_host,
+            db_port=db_port,
             db_username=db_username,
             db_password=db_password,
             db_schema=db_schema,

@@ -206,8 +206,8 @@ async def resolve_hidden_classes(
     term_course_data: dict[str, dict[str, Any]],
     term_crn_set: set[str],
     semaphore: asyncio.Semaphore,
-    tcp_connector: aiohttp.TCPConnector,
-    timeout: int,
+    tcp_connector: aiohttp.TCPConnector = None,
+    timeout: int = 30,
 ) -> list[tuple[str, str, dict[str, Any]]]:
     """
     Checks all crosslist CRNs in the term course data for any hidden classes not shown in
@@ -218,7 +218,8 @@ async def resolve_hidden_classes(
     @param term_crn_set: Set of all CRNs processed in the term.
     @param semaphore: Semaphore to limit number of concurrent sessions between
         multiple calls to this function.
-    @param tcp_connector: TCP connector to use for client sessions.
+    @param tcp_connector: Optional TCP connector to use for client sessions. If not
+        provided, sessions will use a default connector.
     @param timeout: Timeout in seconds for all requests made by a session.
     @return: List of tuples containing subject description, course number, and
         class entry data for each hidden class found.
@@ -226,9 +227,12 @@ async def resolve_hidden_classes(
     async with semaphore:
         timeout_obj = aiohttp.ClientTimeout(total=timeout)
 
-        async with aiohttp.ClientSession(
-            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
-        ) as session:
+        client_session_params = {
+            "connector": tcp_connector,
+            "connector_owner": False if tcp_connector else True,
+            "timeout": timeout_obj,
+        }
+        async with aiohttp.ClientSession(**client_session_params) as session:
             hidden_crns = {
                 crosslist["courseReferenceNumber"]
                 for subject in term_course_data.values()
@@ -288,9 +292,12 @@ async def get_subject_course_data(
     async with semaphore:
         timeout_obj = aiohttp.ClientTimeout(total=timeout)
 
-        async with aiohttp.ClientSession(
-            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
-        ) as session:
+        client_session_params = {
+            "connector": tcp_connector,
+            "connector_owner": False if tcp_connector else True,
+            "timeout": timeout_obj,
+        }
+        async with aiohttp.ClientSession(**client_session_params) as session:
             try:
                 # Reset search state on server before fetching class data
                 await reset_class_search(session, term)
@@ -364,10 +371,13 @@ async def get_term_course_data(
     @return: True on success, False on any unhandled failure.
     """
     timeout_obj = aiohttp.ClientTimeout(total=timeout)
+    client_session_params = {
+        "connector": tcp_connector,
+        "connector_owner": False if tcp_connector else True,
+        "timeout": timeout_obj,
+    }
     try:
-        async with aiohttp.ClientSession(
-            connector=tcp_connector, connector_owner=False, timeout=timeout_obj
-        ) as session:
+        async with aiohttp.ClientSession(**client_session_params) as session:
             subjects = await get_term_subjects(session, term)
 
         if len(subjects) == 0:

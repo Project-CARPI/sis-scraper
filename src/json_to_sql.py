@@ -74,9 +74,9 @@ class DatabaseManager:
 
     def drop_all_tables(self) -> None:
         """
-        Drops all tables in the database.
+        Drops all tables in the database defined by the models.
 
-        WARNING: This will delete all data in the database. Use with caution.
+        WARNING: This will also delete all data in affected tables. Use with caution.
         """
         models.Base.metadata.drop_all(self._engine)
 

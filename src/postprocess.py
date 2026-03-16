@@ -301,7 +301,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
     restriction codes, and instructor RCSIDs, and updating the provided CodeMapper with
     any new mappings found during processing.
 
-    @param term: Term identifier (e.g. "2023FA") for logging purposes.
+    @param term: Term identifier (e.g. "202509") for logging purposes.
     @param term_data: Dictionary containing the raw course data for the term, structured
         as loaded from the raw output JSON files.
     @param mapper: CodeMapper instance to use for managing code mappings and lookups.

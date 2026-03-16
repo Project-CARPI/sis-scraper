@@ -5,10 +5,11 @@ import os
 import sys
 from pathlib import Path
 
-import sis_scraper
+from dotenv import load_dotenv
+
 import json_to_sql
 import postprocess
-from dotenv import load_dotenv
+import sis_scraper
 from logging_config import init_logging
 
 if __name__ == "__main__":

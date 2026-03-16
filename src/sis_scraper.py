@@ -423,7 +423,10 @@ async def get_term_course_data(
 
         # Stop if no course data was fetched for the term
         # Likely indicates a scraper error since every valid term should have some data
-        if len(term_course_data) == 0:
+        if all(
+            len(subject_data["courses"]) == 0
+            for subject_data in term_course_data.values()
+        ):
             logger.warning(f"No course data found for term {term}")
             return False
 

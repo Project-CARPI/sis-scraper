@@ -34,10 +34,16 @@ _RESTRICTION_TYPE_MAP = {
     "Special Approvals": "special_approval",
 }
 
+# Base URL for all SIS class registration API endpoints
 _BASE_URL = "https://sis9.rpi.edu/StudentRegistrationSsb/ssb/"
 
 
 class ClassColumn(str, Enum):
+    """
+    Column names for sorting class search results. These are used as values for the
+    "sortColumn" parameter in class search requests.
+    """
+
     COURSE_TITLE = "courseTitle"
     SUBJECT_DESCRIPTION = "subjectDescription"
     COURSE_NUMBER = "courseNumber"
@@ -51,7 +57,7 @@ def html_unescape(obj: Any) -> Any:
     Recursively unescape HTML entities in all string values within a complex
     structure (dicts, lists, tuples, sets). Dictionary keys are unescaped too.
 
-    @param obj: The object to recursively unescape.
+    @param obj: The object to unescape, which can be a string, dict, list, tuple, etc.
     @return: The same object with all string values unescaped.
     """
     if isinstance(obj, str):
@@ -72,7 +78,14 @@ def html_unescape(obj: Any) -> Any:
     wait=wait_random_exponential(multiplier=1.5) + wait_random(min=0, max=2),
     retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)),
     before_sleep=lambda retry_state: logger.warning(
-        f"Retrying failed request (attempt {retry_state.attempt_number})"
+        f"Retrying failed request (attempt {retry_state.attempt_number}) "
+        f"for URL: {getattr(retry_state.args[1], 'url', retry_state.args[1])} "
+        f"with params: {retry_state.args[2]} | "
+        f"Exception: {(
+            repr(retry_state.outcome.exception())
+            if retry_state.outcome and retry_state.outcome.exception()
+            else 'Unknown'
+        )}"
     ),
 )
 async def retry_get(
@@ -102,8 +115,8 @@ async def get_term_subjects(
     term is invalid or doesn't exist, returns an empty list.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch subjects for (e.g. "202509" for Fall 2025).
-    @return: A list of dictionaries containing subject codes and descriptions.
+    @param term: The term code to fetch subjects for (e.g. "202409" for Fall 2024).
+    @return: A list of dictionaries in the following format:
     ```
     [
         {
@@ -130,10 +143,8 @@ async def get_term_instructors(
     invalid or doesn't exist, returns an empty list.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch instructors for (e.g. "202509" for Fall
-        2025).
-    @return: A list of dictionaries containing instructor codes and
-        descriptions.
+    @param term: The term code to fetch instructors for (e.g. "202409" for Fall 2024).
+    @return: A list of dictionaries in the following format:
     ```
     [
         {
@@ -163,9 +174,8 @@ async def get_all_attributes(
     missing from this list.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param search_term: An optional search term to filter attributes by.
-    @return: A list of dictionaries containing attribute codes and
-        descriptions.
+    @param search_term: An optional search term to filter the attributes.
+    @return: A list of dictionaries in the following format:
     ```
     [
         {
@@ -192,8 +202,8 @@ async def get_all_colleges(
     confused with campuses.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param search_term: An optional search term to filter colleges by.
-    @return: A list of dictionaries containing college codes and descriptions.
+    @param search_term: An optional search term to filter the colleges.
+    @return: A list of dictionaries in the following format:
     ```
     [
         {
@@ -217,11 +227,11 @@ async def get_all_campuses(
 ) -> list[dict[str, str]]:
     """
     Fetches the master list of campuses and codes from SIS. Not to be confused
-    with colleges (School of Architecture, School of Science, etc.).
+    with colleges (schools).
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param search_term: An optional search term to filter campuses by.
-    @return: A list of dictionaries containing campus codes and descriptions.
+    @param search_term: An optional search term to filter the campuses.
+    @return: A list of dictionaries in the following format:
     ```
     [
         {
@@ -240,39 +250,21 @@ async def get_all_campuses(
     return data
 
 
-async def init_class_search(session: aiohttp.ClientSession, term: str) -> None:
+async def reset_class_search(session: aiohttp.ClientSession, term: str) -> None:
     """
-    Initializes the term and subject search state on the SIS server for the
-    given session.
+    Resets the term and subject search state on the SIS server.
 
-    Must be called before attempting to fetch subjects or classes for a term.
-    Only needs to be called once per term, but the subject search state must be
-    reset before each attempt to fetch classes from a subject after the first
-    attempt. Otherwise, the server will continue returning the same results
-    from the last subject accessed.
+    Must be called before each attempt to fetch classes from a subject in the
+    given term. Otherwise, the server will continue returning the same results
+    from the last subject accessed, or no data if attempting to access data
+    from a different term.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to initialize search state for (e.g. "202509" for
-        Fall 2025).
+    @param term: The term code to reset the search state for.
     """
     url = _BASE_URL + "term/search"
     params = {"mode": "search", "term": term}
     await retry_get(session, url, params)
-
-
-async def reset_class_search(session: aiohttp.ClientSession) -> None:
-    """
-    Resets the subject search state on the SIS server for the given session.
-
-    Must be called after initializing the term and subject search state, and
-    before each attempt to fetch classes from a subject after the first
-    attempt. Otherwise, the server will continue returning the same results
-    from the last subject accessed.
-
-    @param session: An aiohttp ClientSession to use for the request.
-    """
-    url = _BASE_URL + "classSearch/resetDataForm"
-    await retry_get(session, url, params={})
 
 
 async def class_search(
@@ -290,13 +282,13 @@ async def class_search(
     each call to this function.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch classes for (e.g. "202509" for Fall 2025).
-    @param subject: The subject to fetch classes for (e.g. "CSCI").
-    @param max_size: The maximum number of classes to return.
+    @param term: The term code to search within.
+    @param subject: The subject code to search for.
+    @param max_size: Maximum number of results to return.
     @param sort_column: The column to sort results by.
-    @param sort_asc: Whether to sort in ascending order.
-    @return: A list of dictionaries containing class data. If the term or \
-        subject is invalid, returns an empty list.
+    @param sort_asc: Whether to sort ascending (True) or descending (False).
+    @return: A list of class dictionaries. Returned data format is very large;
+        see the repository README for details.
     """
     url = _BASE_URL + "searchResults/searchResults"
     params = {
@@ -316,6 +308,58 @@ async def class_search(
     return course_data
 
 
+async def get_class_details(
+    session: aiohttp.ClientSession, term: str, crn: str
+) -> dict[str, Any]:
+    """
+    Fetches and parses data from the "Details" tab of a class details page.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A dictionary in the following format:
+    ```
+    {
+        "courseReferenceNumber": "12345",
+        "subjectName": "Computer Science",
+        "courseNumber": "1100",
+        "title": "COMPUTER SCIENCE I",
+        "sectionNumber": "01",
+        "creditMin": 4,
+        "creditMax": None
+    }
+    ```
+    """
+    url = _BASE_URL + "searchResults/getClassDetails"
+    params = {"term": term, "courseReferenceNumber": crn}
+    raw_data = await retry_get(session, url, params)
+    raw_data = html_unescape(raw_data)
+    soup = bs4.BeautifulSoup(raw_data, "html5lib")
+    details_tag = soup.find("section", {"aria-labelledby": "classDetails"})
+    crn = details_tag.find("span", {"id": "courseReferenceNumber"}).text.strip()
+    section_num = details_tag.find("span", {"id": "sectionNumber"}).text.strip()
+    subj_name = details_tag.find("span", {"id": "subject"}).text.strip()
+    course_num = details_tag.find("span", {"id": "courseDisplay"}).text.strip()
+    title = details_tag.find("span", {"id": "courseTitle"}).text.strip()
+    # Only courses with a credit range have a span with id "credit-hours-discretion",
+    # otherwise the credit hours span follows a span with text "Credit Hours:".
+    credit_min, credit_max = None, None
+    if credit_hours_tag := details_tag.find("span", {"id": "credit-hours-discretion"}):
+        credit_min, credit_max = credit_hours_tag.text.strip().split(" TO ")
+    else:
+        credit_hours_tag = details_tag.find("span", text="Credit Hours:")
+        credit_min = credit_hours_tag.next_sibling.text.strip()
+    return {
+        "courseReferenceNumber": crn,
+        "subjectName": subj_name,
+        "courseNumber": course_num,
+        "title": title,
+        "sectionNumber": section_num,
+        "creditMin": int(credit_min) if credit_min is not None else None,
+        "creditMax": int(credit_max) if credit_max is not None else None,
+    }
+
+
 async def get_class_description(
     session: aiohttp.ClientSession, term: str, crn: str
 ) -> str:
@@ -323,15 +367,11 @@ async def get_class_description(
     Fetches and parses data from the "Course Description" tab of a class
     details page.
 
-    Returns a string containing the course description, without any
-    additional fields such as "When Offered", "Credit Hours", "Prerequisite",
-    etc.
-
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch the class description for (e.g. "202509" for
-        Fall 2025).
-    @param crn: The course reference number to fetch the class description for.
-    @return: A string containing the course description.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A string containing the course description, without any additional fields
+        such as "When Offered", "Credit Hours", "Prerequisite", etc.
     """
     url = _BASE_URL + "searchResults/getCourseDescription"
     params = {"term": term, "courseReferenceNumber": crn}
@@ -348,6 +388,55 @@ async def get_class_description(
     for text in description_text_list:
         if text != "":
             return text
+    return ""
+
+
+async def get_class_enrollment(
+    session: aiohttp.ClientSession, term: str, crn: str
+) -> dict[str, Any]:
+    """
+    Fetches and parses data from the "Enrollment/Waitlist" tab of a class details page.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A dictionary in the following format:
+    ```
+    {
+        "enrollmentActual": 28,
+        "enrollmentCapacity": 30,
+        "enrollmentAvailable": 2,
+        "waitlistActual": 0,
+        "waitlistCapacity": 10,
+        "waitlistAvailable": 10
+    }
+    ```
+    """
+    url = _BASE_URL + "searchResults/getEnrollmentInfo"
+    params = {"term": term, "courseReferenceNumber": crn}
+    raw_data = await retry_get(session, url, params)
+    raw_data = html_unescape(raw_data)
+    soup = bs4.BeautifulSoup(raw_data, "html5lib")
+    enrollment_tag = soup.find("section", {"aria-labelledby": "enrollmentInfo"})
+    # There are no relevant classes or ids on the spans, so we have to rely on the text
+    # content of the preceding <span> tags.
+    enrollment_data = {}
+    span_tags = enrollment_tag.find_all("span")
+    for i, tag in enumerate(span_tags):
+        text = tag.text.strip()
+        if text == "Enrollment Actual:":
+            enrollment_data["enrollmentActual"] = int(span_tags[i + 1].text.strip())
+        elif text == "Enrollment Maximum:":
+            enrollment_data["enrollmentCapacity"] = int(span_tags[i + 1].text.strip())
+        elif text == "Enrollment Seats Available:":
+            enrollment_data["enrollmentAvailable"] = int(span_tags[i + 1].text.strip())
+        elif text == "Waitlist Capacity:":
+            enrollment_data["waitlistCapacity"] = int(span_tags[i + 1].text.strip())
+        elif text == "Waitlist Actual:":
+            enrollment_data["waitlistActual"] = int(span_tags[i + 1].text.strip())
+        elif text == "Waitlist Seats Available:":
+            enrollment_data["waitlistAvailable"] = int(span_tags[i + 1].text.strip())
+    return enrollment_data
 
 
 async def get_class_attributes(
@@ -357,15 +446,14 @@ async def get_class_attributes(
     Fetches and parses data from the "Attributes" tab of a class details page.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch class attributes for (e.g. "202509" for Fall
-        2025).
-    @param crn: The course reference number to fetch class attributes for.
-    @return: A list of strings containing class attributes.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A list of strings in the following format:
     ```
     [
-        "Attribute 1",
-        "Attribute 2",
-        "Attribute 3",
+        "Communication Intensive  COMM",
+        "Data Intensive I  DI1",
+        "Introductory Level Course  FRSH",
         ...
     ]
     ```
@@ -388,18 +476,28 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     page.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch class restrictions for (e.g. "202509" for
-        Fall 2025).
-    @param crn: The course reference number to fetch class restrictions for.
-    @return: A dictionary containing class restrictions.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A dictionary in the following format:
     ```
     {
-        "major": ["Allowed Major 1", ...],
-        "not_major": ["Disallowed Major 1", ...],
-        "level": ["Allowed Level 1", ...],
-        "not_level": ["Disallowed Level 1", ...],
-        "classification": ["Allowed Classification 1", ...],
-        "not_classification": ["Disallowed Classification 1", ...]
+        "major": [
+            "Architecture (ARCH)",
+            ...
+        ],
+        "not_major": [
+            "Computer Science (CSCI)",
+            ...
+        ],
+        "classification": [
+            "Freshman (FR)",
+            ...
+        ],
+        "not_classification": [
+            "Senior (SR)",
+            ...
+        ],
+        ...
     }
     ```
     """
@@ -408,7 +506,7 @@ async def get_class_restrictions(session: aiohttp.ClientSession, term: str, crn:
     raw_data = await retry_get(session, url, params)
     raw_data = html_unescape(raw_data)
     soup = bs4.BeautifulSoup(raw_data, "html5lib")
-    # Dynamically build restrictions_data dict structure from RESTRICTION_TYPE_MAP values
+    # Dynamically build dict structure from RESTRICTION_TYPE_MAP values
     restrictions_data = {}
     bases = set(_RESTRICTION_TYPE_MAP.values())
     for base in sorted(bases):
@@ -513,10 +611,9 @@ async def get_class_prerequisites(
     page.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch class prerequisites for (e.g. "202509" for
-        Fall 2025).
-    @param crn: The course reference number to fetch class prerequisites for.
-    @return: A dictionary containing class prerequisites.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A dictionary in the following format:
     ```
     {
         "id": 0,
@@ -586,14 +683,16 @@ async def get_class_corequisites(
     page.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch class corequisites for (e.g. "202509" for
-        Fall 2025).
-    @param crn: The course reference number to fetch class corequisites for.
-    @return: A list of strings containing class corequisites.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A list of dictionaries in the following format:
     ```
     [
-        "Computer Science 1100",
-        "Mathematics 1010",
+        {
+            "subjectName": "Computer Science",
+            "courseNumber": "1100",
+            "title": "COMPUTER SCIENCE I"
+        },
         ...
     ]
     ```
@@ -612,7 +711,7 @@ async def get_class_corequisites(
     if not coreqs_thead or not coreqs_tbody:
         return []
     thead_cols = [th.text.strip() for th in coreqs_thead.find_all("th")]
-    # Known corequisite columns are Subject, Course, and Title
+    # Known corequisite columns are Subject, Course Number, and Title
     if len(thead_cols) != 3:
         logger.warning(
             f"Unexpected number of corequisite columns for CRN {crn} in term {term}"
@@ -627,9 +726,10 @@ async def get_class_corequisites(
                 f"CRN {crn} in term {term}"
             )
             continue
-        subject = cols[0]
-        course_num = cols[1]
-        coreqs.append(f"{subject} {course_num}")
+        subject, course_num, title = cols
+        coreqs.append(
+            {"subjectName": subject, "courseNumber": course_num, "title": title}
+        )
     return coreqs
 
 
@@ -637,20 +737,24 @@ async def get_class_crosslists(
     session: aiohttp.ClientSession,
     term: str,
     crn: str,
-):
+) -> list[dict[str, Any]]:
     """
     Fetches and parses data from the "Cross Listed" tab of a class details
     page.
 
     @param session: An aiohttp ClientSession to use for the request.
-    @param term: The term to fetch class crosslists for (e.g. "202509" for Fall
-        2025).
-    @param crn: The course reference number to fetch class crosslists for.
-    @return: A list of strings containing class crosslists.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A list of dictionaries in the following format:
     ```
     [
-        "Computer Science 1100",
-        "Mathematics 1010",
+        {
+            "courseReferenceNumber": "12345",
+            "subjectName": "Computer Science",
+            "courseNumber": "1100",
+            "title": "COMPUTER SCIENCE I",
+            "sectionNumber": "01"
+        },
         ...
     ]
     ```
@@ -684,7 +788,159 @@ async def get_class_crosslists(
                 f"CRN {crn} in term {term}"
             )
             continue
-        subject = cols[1]
-        code = cols[2]
-        crosslists.append(f"{subject} {code}")
+        crn, subject, course_num, title, section_num = cols
+        crosslists.append(
+            {
+                "courseReferenceNumber": crn,
+                "subjectName": subject,
+                "courseNumber": course_num,
+                "title": title,
+                "sectionNumber": section_num,
+            }
+        )
     return crosslists
+
+
+async def get_class_faculty_meetings(
+    session: aiohttp.ClientSession,
+    term: str,
+    crn: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """
+    Fetches and parses data from the "Instructor/Meeting Times" tab of a class details
+    page.
+
+    @param session: An aiohttp ClientSession to use for the request.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: A dictionary containing faculty and meeting lists in the following format:
+    ```
+    {
+        "faculty": [
+            {
+                "displayName": "Last First",
+                "emailAddress": "example@rpi.edu",
+                "allMeetings": [1, 2, ...],
+                "primaryMeetings": [1, ...]
+            },
+            ...
+        ],
+        "meetings": [
+            {
+                "id": 1,
+                "beginTime": "0800",
+                "endTime": "0950",
+                "creditHours": 4,
+                "campusCode": "T",
+                "campusDescription": "Troy",
+                "buildingCode": "SAGE",
+                "buildingDescription": "Russell Sage Laboratory",
+                "category": "L",
+                "room": "303",
+                "startDate": "01/15/2024",
+                "endDate": "05/01/2024",
+                "days": ["M", "W", "F"]
+            },
+            ...
+        ]
+    }
+    ```
+    """
+    url = _BASE_URL + "searchResults/getFacultyMeetingTimes"
+    params = {"term": term, "courseReferenceNumber": crn}
+    raw_data = await retry_get(session, url, params)
+    json_data = json.loads(raw_data)
+    json_data = html_unescape(json_data)
+    sis_faculty_meetings_list = json_data["fmt"]
+    meetings_list = _process_class_faculty_meetings(
+        sis_faculty_meetings_list, term, crn
+    )
+    return meetings_list
+
+
+def _process_class_faculty_meetings(
+    sis_faculty_meetings_list: list[dict[str, Any]],
+    term: str,
+    crn: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """
+    Processes raw class meeting data from SIS into a more usable format.
+
+    @param sis_faculty_meetings_list: Raw faculty meeting data list.
+    @param term: The term code of the class.
+    @param crn: The course reference number of the class.
+    @return: See get_class_faculty_meetings() for returned data format.
+    """
+    faculty_dict = {}
+    meetings_list = []
+    day_codes = {
+        "sunday": "U",
+        "monday": "M",
+        "tuesday": "T",
+        "wednesday": "W",
+        "thursday": "R",
+        "friday": "F",
+        "saturday": "S",
+    }
+    for i, faculty_meeting in enumerate(sis_faculty_meetings_list, start=1):
+        sis_meeting_info = faculty_meeting["meetingTime"]
+        sis_faculty_list = faculty_meeting["faculty"]
+        if sis_meeting_info is None and sis_faculty_list is None:
+            logger.warning(
+                "Found faculty-meeting entry with no meeting info or faculty list for "
+                f"CRN {crn} in term {term}"
+            )
+            continue
+        if sis_meeting_info is not None:
+            meeting_info = {
+                "id": i,
+                "beginTime": sis_meeting_info["beginTime"],
+                "endTime": sis_meeting_info["endTime"],
+                "creditHours": sis_meeting_info["creditHourSession"],
+                "campusCode": sis_meeting_info["campus"],
+                "campusDescription": sis_meeting_info["campusDescription"],
+                "buildingCode": sis_meeting_info["building"],
+                "buildingDescription": sis_meeting_info["buildingDescription"],
+                "category": sis_meeting_info["category"],
+                "room": sis_meeting_info["room"],
+                "startDate": sis_meeting_info["startDate"],
+                "endDate": sis_meeting_info["endDate"],
+                "days": [
+                    code for day, code in day_codes.items() if sis_meeting_info[day]
+                ],
+            }
+            meetings_list.append(meeting_info)
+        else:
+            logger.warning(
+                f"Found faculty-meeting entry with no meeting info for CRN {crn} "
+                f"in term {term}"
+            )
+        if sis_faculty_list is not None:
+            for faculty in sis_faculty_list:
+                banner_id = faculty["bannerId"]
+                # Initialize faculty entry if it doesn't exist
+                faculty_entry = faculty_dict.setdefault(
+                    banner_id,
+                    {
+                        "displayName": faculty["displayName"],
+                        "emailAddress": faculty["emailAddress"],
+                        "allMeetings": [],
+                        "primaryMeetings": [],
+                    },
+                )
+                if sis_meeting_info:
+                    # Add meeting ID to faculty's meeting lists
+                    faculty_entry["allMeetings"].append(i)
+                    if faculty["primaryIndicator"]:
+                        faculty_entry["primaryMeetings"].append(i)
+        else:
+            logger.warning(
+                f"Found faculty-meeting entry with no faculty list for CRN {crn} "
+                f"in term {term}"
+            )
+    # Convert faculty dictionary into a list
+    faculty_list = list(faculty_dict.values())
+    return {
+        "faculty": faculty_list,
+        "meetings": meetings_list,
+    }

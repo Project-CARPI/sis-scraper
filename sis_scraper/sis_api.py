@@ -606,10 +606,8 @@ async def get_class_prerequisites(
         def recurse(index, type_idx, cur_grouping):
             if index == len(all_info):
                 return cur_grouping
-
             cur_text = all_info[index]
             course_name = f"{cur_text[4]} {cur_text[5]}"
-
             if cur_text[1] == "(":
                 # Increment for the new nested group
                 counter[0] += 1
@@ -618,17 +616,13 @@ async def get_class_prerequisites(
                     "type": all_info[type_idx][0],
                     "values": [course_name],
                 }
-
                 # Recurse to fill the nested group
                 res, next_index = recurse(index + 1, type_idx + 1, new_group)
                 cur_grouping["values"].append(res)
-
                 # Continue processing the current level after the nested group closes
                 return recurse(next_index, type_idx + 1, cur_grouping)
-
             else:
                 cur_grouping["values"].append(course_name)
-
                 # If we hit a closing bracket, return the current state and the next index
                 if cur_text[8] == ")":
                     return cur_grouping, index + 1
@@ -638,58 +632,13 @@ async def get_class_prerequisites(
         # Initial call
         if not all_info:
             return {}
-
         initial_dict = {"id": counter[0], "type": all_info[1][0], "values": []}
         final_res = recurse(0, 1, initial_dict)
-
         # Handle the tuple return from the recursive function
         return final_res[0] if isinstance(final_res, tuple) else final_res
 
     result = find_all_subclasses(all_info)
-    print(json.dumps(result, indent=2))
-    # def find_all_subclasses(
-    #     id_int: int, index: int, type: int, cur_grouping: dict
-    # ) -> dict:
-    #     if index == len(all_info):
-    #         return cur_grouping
-    #     cur_text = all_info[index]
-    #     course_name = cur_text[4] + " " + cur_text[5]
-    #     if cur_text[1] == "(":
-    #         res = find_all_subclasses(
-    #             id_int + 1,
-    #             index + 1,
-    #             type + 1,
-    #             {
-    #                 "id": id_int,
-    #                 "type": all_info[type][0],
-    #                 "values": [course_name],
-    #             },
-    #         )
-    #         if res:
-    #             cur_grouping["values"].append(res[0])
-    #             return find_all_subclasses(
-    #                 id_int + 1, index + res[1], type + 1, cur_grouping
-    #             )
-    #     else:
-    #         cur_grouping["values"].append(course_name)
-    #         if cur_text[8] == ")":
-    #             return (cur_grouping, len(cur_grouping["values"]))
-    #         else:
-    #             return find_all_subclasses(
-    #                 id_int + 1, index + 1, type + 1, cur_grouping
-    #             )
-
-    # if len(all_info) > 0:
-    #     # id, index, and/or, current_grouping
-    #     # return the finished {}
-    #     res = find_all_subclasses(
-    #         0, 0, 1, {"id": 0, "type": all_info[1][0], "values": []}
-    #     )
-    #     print(f"here is final res:")
-    #     print(json.dumps(res, indent=2))
-    #     return res
-    # else:
-    #     return {}
+    return result
 
 
 async def get_class_corequisites(

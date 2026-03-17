@@ -601,44 +601,59 @@ async def get_class_prerequisites(
 
     def find_all_subclasses(all_info):
         # This list acts as a reference that stays consistent through recursion
-        counter = [0]
+        counter = [1]
+        all_info_count = [1]
 
-        def recurse(index, type_idx, cur_grouping):
-            if index == len(all_info):
+        def recurse(cur_grouping):
+            if all_info_count[0] == len(all_info):
                 return cur_grouping
-            cur_text = all_info[index]
-            course_name = f"{cur_text[4]} {cur_text[5]}"
-            if cur_text[1] == "(":
-                # Increment for the new nested group
-                counter[0] += 1
-                new_group = {
+
+            current_parsing_class = all_info[all_info_count[0]]
+
+            # If there's no type, set it first
+            if cur_grouping["type"] is None:
+                cur_grouping["type"] = current_parsing_class[0]
+
+            all_info_count[0] += 1
+            if current_parsing_class[1] == "(":
+                new_grouping = {
                     "id": counter[0],
-                    "type": all_info[type_idx][0],
-                    "values": [course_name],
+                    "type": None,
+                    "values": [
+                        f"{current_parsing_class[4]} {current_parsing_class[5]}"
+                    ],
                 }
-                # Recurse to fill the nested group
-                res, next_index = recurse(index + 1, type_idx + 1, new_group)
+                counter[0] += 1
+                res = recurse(new_grouping)
                 cur_grouping["values"].append(res)
-                # Continue processing the current level after the nested group closes
-                return recurse(next_index, type_idx + 1, cur_grouping)
+                return recurse(cur_grouping)
+            elif current_parsing_class[8] == ")":
+                cur_grouping["values"].append(
+                    f"{current_parsing_class[4]} {current_parsing_class[5]}"
+                )
+                return cur_grouping
             else:
-                cur_grouping["values"].append(course_name)
-                # If we hit a closing bracket, return the current state and the next index
-                if cur_text[8] == ")":
-                    return cur_grouping, index + 1
-                else:
-                    return recurse(index + 1, type_idx + 1, cur_grouping)
+                cur_grouping["values"].append(
+                    f"{current_parsing_class[4]} {current_parsing_class[5]}"
+                )
+                return recurse(cur_grouping)
 
         # Initial call
         if not all_info:
             return {}
-        initial_dict = {"id": counter[0], "type": all_info[1][0], "values": []}
-        final_res = recurse(0, 1, initial_dict)
+
+        initial_dict = {
+            "id": 0,
+            "type": None,
+            "values": [f"{all_info[0][4]} {all_info[0][5]}"],
+        }
+        final_res = recurse(initial_dict)
+
         # Handle the tuple return from the recursive function
         return final_res[0] if isinstance(final_res, tuple) else final_res
 
     result = find_all_subclasses(all_info)
-    return result
+    print(json.dumps(result, indent=2))
 
 
 async def get_class_corequisites(

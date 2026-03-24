@@ -59,26 +59,26 @@ def main():
 
 def scrape_degree_details(url):
     """Parses individual degree pages for requirements."""
-    response = requests.get(url)
+    response = requests.get(url, headers=HEADERS)
     if response.status_code != 200:
-        return
+        return []
 
     soup = BeautifulSoup(response.text, "html.parser")
-
-    # RPI Catalog often puts requirements in 100% width tables or specific 'acalog-core' divs
-    # This logic looks for headers (h2/h3) and the lists following them
     cores = soup.find_all("div", class_="acalog-core")
 
+    degree_data = []
+
     for core in cores:
-        # Extract the requirement header (e.g., 'Required Courses')
         header = core.find(["h2", "h3", "h4"])
         if header:
-            print(f"  Section: {header.get_text(strip=True)}")
+            section_name = header.get_text(strip=True)
 
-            # Find all course links/names in this section
             courses = core.find_all("li", class_="acalog-course")
             for course in courses:
-                print(f"    - {course.get_text(strip=True)}")
+                course_name = course.get_text(strip=True)
+                degree_data.append([section_name, course_name])
+
+    return degree_data
 
 
 if __name__ == "__main__":

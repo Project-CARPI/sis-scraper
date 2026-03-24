@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-import time
+import time, csv
 
 
 def main():
@@ -52,7 +52,6 @@ def main():
 
                         # Be nice to the server!
                         time.sleep(1)
-
     except Exception as e:
         print(f"An error occurred: {e}")
 

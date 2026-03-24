@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
+import csv
 
 
 def main():
@@ -43,10 +44,23 @@ def main():
                     href = "https://catalog.rpi.edu/" + link_tag.get("href")
                     master_degrees.append({"name": name, "link": href})
 
-    # Output results
-    print(f"\nFound {len(master_degrees)} Master's Degrees:")
-    for degree in master_degrees:
-        print(f"- {degree['name']} ({degree['link']})")
+    # Save results to CSV
+    output_file = "masters_degrees.csv"
+
+    with open(output_file, "w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+
+        # Header row
+        writer.writerow(["Degree Name", "Link"])
+
+        # Data rows
+        for degree in master_degrees:
+            writer.writerow([degree["name"], degree["link"]])
+
+    print(f"\nData saved to {output_file}")
+    # print(f"\nFound {len(master_degrees)} Master's Degrees:")
+    # for degree in master_degrees:
+    #     print(f"- {degree['name']} ({degree['link']})")
 
 
 if __name__ == "__main__":

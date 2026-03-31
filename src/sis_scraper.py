@@ -117,7 +117,7 @@ async def process_class_details(
         "description": "",
         "attributes": [],
         "restrictions": {},
-        "prerequisites": [],
+        "prerequisites": {},
         "corequisites": [],
         "crosslists": [],
         "creditMin": -1,

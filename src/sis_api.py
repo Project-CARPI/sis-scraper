@@ -5,7 +5,6 @@ import logging
 import re
 from enum import Enum
 from typing import Any
-from pprint import pprint
 
 import aiohttp
 import bs4
@@ -702,7 +701,7 @@ async def get_class_prerequisites(
         return final_res[0] if isinstance(final_res, tuple) else final_res
 
     result = find_all_subclasses(all_info)
-    print(json.dumps(result, indent=2))
+    return result
 
 
 async def get_class_corequisites(

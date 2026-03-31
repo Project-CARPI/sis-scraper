@@ -1,7 +1,9 @@
 import asyncio
-import aiohttp
-import sis_api
 import json
+
+import aiohttp
+
+import sis_api
 
 
 async def main():
@@ -18,7 +20,8 @@ async def main():
             all_crns.add(item["courseReferenceNumber"])
 
         # for crn in all_crns:
-        await sis_api.get_class_prerequisites(session, "202509", "72027")
+        result = await sis_api.get_class_prerequisites(session, "202509", "72027")
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
+
 from sis_api import (
     class_search,
     get_class_attributes,

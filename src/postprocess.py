@@ -403,6 +403,48 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                             new_list.append(f"{subj_code} {course_num}")
                         class_entry[field] = new_list
 
+                # Prerequisites
+                def process_prereq_level(
+                    prereq_struct: dict[str, Any],
+                ) -> dict[str, Any]:
+                    prereq_list = prereq_struct.get("values", [])
+                    if len(prereq_list) == 0:
+                        return prereq_struct
+                    new_prereq_list = []
+                    for prereq in prereq_list:
+                        if isinstance(prereq, dict):
+                            # Nested structure
+                            new_prereq_list.append(process_prereq_level(prereq))
+                            continue
+                        # Parse "[subject_name] [course_number]"
+                        match = re.match(r"(.+)\s+(\S+)", prereq)
+                        if not match:
+                            logger.warning(
+                                f"Unexpected prerequisite format: '{prereq}' "
+                                f"for CRN {class_entry['courseReferenceNumber']} "
+                                f"in term {term}"
+                            )
+                            new_prereq_list.append(prereq)
+                            continue
+                        subj_name, course_num = match.groups()
+                        subj_code = mapper.get_subject_code(subj_name)
+                        # Fallback to subject name if code mapping not found
+                        if subj_code is None:
+                            logger.warning(
+                                f"Subject name '{subj_name}' not found in mapping "
+                                f"for CRN {class_entry['courseReferenceNumber']} "
+                                f"in term {term}"
+                            )
+                            subj_code = subj_name
+                        new_prereq_list.append(f"{subj_code} {course_num}")
+                    prereq_struct["values"] = new_prereq_list
+                    return prereq_struct
+
+                if "prerequisites" in class_entry:
+                    class_entry["prerequisites"] = process_prereq_level(
+                        class_entry["prerequisites"]
+                    )
+
 
 def main(
     output_data_dir: Path | str,

@@ -680,7 +680,7 @@ async def get_class_prerequisites(
                 }
                 counter[0] += 1
                 res = recurse(new_grouping)
-                add_value(cur_grouping, current_parsing_class)
+                cur_grouping["values"].append(res)
                 return recurse(cur_grouping)
             elif current_parsing_class[8] == ")":
                 add_value(cur_grouping, current_parsing_class)

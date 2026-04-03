@@ -647,6 +647,13 @@ async def get_class_prerequisites(
         headers = [td.get_text(strip=True) for td in prereq_info.find_all("td")]
         all_info.append(headers)
 
+    def add_value(grouping, course_parts):
+        # Join the parts, strip whitespace
+        val = f"{course_parts[4]} {course_parts[5]}".strip()
+        # Only append if the string actually contains characters
+        if val:
+            grouping["values"].append(val)
+
     def find_all_subclasses(all_info):
         # This list acts as a reference that stays consistent through recursion
         counter = [1]
@@ -660,7 +667,7 @@ async def get_class_prerequisites(
 
             # If there's no type, set it first
             if cur_grouping["type"] is None:
-                cur_grouping["type"] = current_parsing_class[0]
+                cur_grouping["type"] = current_parsing_class[0].lower()
 
             all_info_count[0] += 1
             if current_parsing_class[1] == "(":
@@ -673,17 +680,13 @@ async def get_class_prerequisites(
                 }
                 counter[0] += 1
                 res = recurse(new_grouping)
-                cur_grouping["values"].append(res)
+                add_value(cur_grouping, res)
                 return recurse(cur_grouping)
             elif current_parsing_class[8] == ")":
-                cur_grouping["values"].append(
-                    f"{current_parsing_class[4]} {current_parsing_class[5]}"
-                )
+                add_value(cur_grouping, current_parsing_class)
                 return cur_grouping
             else:
-                cur_grouping["values"].append(
-                    f"{current_parsing_class[4]} {current_parsing_class[5]}"
-                )
+                add_value(cur_grouping, current_parsing_class)
                 return recurse(cur_grouping)
 
         # Initial call

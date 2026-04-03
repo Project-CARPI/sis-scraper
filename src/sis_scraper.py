@@ -133,20 +133,33 @@ async def process_class_details(
     }
 
     # Fetch class details not included in SIS class search
-    async with asyncio.TaskGroup() as tg:
-        description_task = tg.create_task(get_class_description(session, term, crn))
-        attributes_task = tg.create_task(get_class_attributes(session, term, crn))
-        restrictions_task = tg.create_task(get_class_restrictions(session, term, crn))
-        prerequisites_task = tg.create_task(get_class_prerequisites(session, term, crn))
-        corequisites_task = tg.create_task(get_class_corequisites(session, term, crn))
-        crosslists_task = tg.create_task(get_class_crosslists(session, term, crn))
-        faculty_meetings_task = tg.create_task(
-            get_class_faculty_meetings(session, term, crn)
-        )
-        # Fetch full class details if not provided from SIS class search
-        if sis_class_entry is None:
-            details_task = tg.create_task(get_class_details(session, term, crn))
-            enrollment_task = tg.create_task(get_class_enrollment(session, term, crn))
+    try:
+        async with asyncio.TaskGroup() as tg:
+            description_task = tg.create_task(get_class_description(session, term, crn))
+            attributes_task = tg.create_task(get_class_attributes(session, term, crn))
+            restrictions_task = tg.create_task(
+                get_class_restrictions(session, term, crn)
+            )
+            prerequisites_task = tg.create_task(
+                get_class_prerequisites(session, term, crn)
+            )
+            corequisites_task = tg.create_task(
+                get_class_corequisites(session, term, crn)
+            )
+            crosslists_task = tg.create_task(get_class_crosslists(session, term, crn))
+            faculty_meetings_task = tg.create_task(
+                get_class_faculty_meetings(session, term, crn)
+            )
+            # Fetch full class details if not provided from SIS class search
+            if sis_class_entry is None:
+                details_task = tg.create_task(get_class_details(session, term, crn))
+                enrollment_task = tg.create_task(
+                    get_class_enrollment(session, term, crn)
+                )
+    except Exception as e:
+        raise RuntimeError(
+            f"Error fetching details for CRN {crn} in term {term}"
+        ) from e
 
     # Wait for tasks to complete and get results
     description_data = description_task.result()

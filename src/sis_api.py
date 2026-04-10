@@ -696,8 +696,12 @@ async def get_class_prerequisites(
         initial_dict = {
             "id": 0,
             "type": None,
-            "values": [f"{all_info[0][4]} {all_info[0][5]}"],
+            "values": [],
         }
+
+        # Add initial value to dict if it exists
+        add_value(initial_dict, all_info[0])
+
         final_res = recurse(initial_dict)
 
         # Handle the tuple return from the recursive function

@@ -244,6 +244,8 @@ def process_term(
     course_offering_models: list[models.Course_Offering],
     course_faculty_models: list[models.Course_Faculty],
     processed_courses: set[str],
+    prereq_course_models: list[models.Prerequisite_Course],
+    prereq_nesting_models: list[models.Prerequisite_Nesting],
 ) -> None:
     """
     Processes the data for a single term and appends model instances to the provided
@@ -375,6 +377,70 @@ def process_term(
                         for restr_code in restriction_values
                     ]
                 )
+            # Add prerequisite courses (JSON to SQL)
+            # {
+            #     "id": 0,
+            #     "type": "and",
+            #     "values": [
+            #         {"id": 1, "type": "or", "values": ["Physics 1200", ...]},
+            #         "Computer Science 1100",
+            #         "Mathematics 1010",
+            #     ],
+            # }
+            # Each new listing is its own row in the nesting table
+            # Otherwise, it is a prereq course table
+            # prereq_course_models,
+            # prereq_nesting_models
+
+            print(main_section["prerequisites"])
+            prerequisites = main_section["prerequisites"]
+            if not prerequisites:
+                continue
+
+            def recursion(prereqs: dict, parent_id: int, id: int):
+                cur_type = prereqs["type"]
+                values = prereqs["values"]
+
+                prereq_nesting_models.append(
+                    models.Prerequisite_Nesting(
+                        og_subj_code=subject_code,
+                        og_code_num=course_num,
+                        id=id,
+                        relationship=(
+                            models.PrerequisiteNestingTypeEnum.AND
+                            if cur_type == "and"
+                            else models.PrerequisiteNestingTypeEnum.OR
+                        ),
+                        parent_id=parent_id,
+                    )
+                )
+
+                if parent_id is None:
+                    parent_id = 1
+
+                for item in values:
+                    if isinstance(item, str):
+                        # add to prerequitiste_course
+                        # og_subj_code = subject_code
+                        # og_code_num = course_num
+                        # parent_id = parent_id
+                        # new_subj_code = item.split(" ")[0]
+                        # new_code_num = item.split(" ")[1]
+                        subj_code_num = item.split(" ")
+                        prereq_course_models.append(
+                            models.Prerequisite_Course(
+                                og_subj_code=subject_code,
+                                og_code_num=course_num,
+                                parent_id=parent_id,
+                                new_subj_code=subj_code_num[0],
+                                new_code_num=subj_code_num[1],
+                            )
+                        )
+                    else:
+                        # parent_id += 1
+                        recursion(item, parent_id + 1, id + 1)
+
+            recursion(prerequisites, None, 1)
 
 
 def main(
@@ -477,6 +543,8 @@ def main(
         course_attribute = []
         course_relationship = []
         course_restriction = []
+        prereq_nesting = []
+        prereq_course = []
 
         # Track processed courses to prioritize latest data across multiple semesters
         processed_courses = set()
@@ -501,6 +569,8 @@ def main(
                 course_offering_models=course_offering,
                 course_faculty_models=course_faculty,
                 processed_courses=processed_courses,
+                prereq_course_models=prereq_course,
+                prereq_nesting_models=prereq_nesting,
             )
 
         # Insert code mappings and course data into the database
@@ -515,6 +585,8 @@ def main(
             course_restriction,
             course_offering,
             course_faculty,
+            prereq_nesting,
+            prereq_course,
         )
         logger.info(f"Committed {len(restriction_models)} restrictions")
         logger.info(f"Committed {len(attribute_models)} attributes")
@@ -526,6 +598,8 @@ def main(
         logger.info(f"Committed {len(course_restriction)} course restrictions")
         logger.info(f"Committed {len(course_offering)} course offerings")
         logger.info(f"Committed {len(course_faculty)} course faculty assignments")
+        logger.info(f"Committed {len(prereq_course)} prerequisite courses")
+        logger.info(f"Committed {len(prereq_nesting)} prerequisite nestings")
 
         db_manager.close_connection()
 

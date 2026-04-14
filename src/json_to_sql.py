@@ -6,6 +6,7 @@ import carpi_data_model.models as models
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +93,11 @@ class DatabaseManager:
         """
         with self._session_factory() as session:
             for model_list in model_lists:
-                session.add_all(model_list)
-                session.flush()
+                for model in model_list:
+                    session.add(model)
+                    session.flush()
+                # session.add_all(model_list)
+                # session.flush()
             session.commit()
 
 
@@ -392,55 +396,65 @@ def process_term(
             # prereq_course_models,
             # prereq_nesting_models
 
-            print(main_section["prerequisites"])
+            # type, values
+
+            key_id = 0
             prerequisites = main_section["prerequisites"]
+
             if not prerequisites:
                 continue
 
-            def recursion(prereqs: dict, parent_id: int, id: int):
+            # print(f"{subject_code}-{course_num}")
+
+            def recursion(prereqs: dict, parent_id: int):
+                nonlocal key_id
+                key_id += 1
+
+                # This is the unique ID for THIS specific Nesting (the 'box' in your diagram)
+                current_box_id = key_id
+
                 cur_type = prereqs["type"]
                 values = prereqs["values"]
 
+                # 1. Create the Nesting record for the 'box'
                 prereq_nesting_models.append(
                     models.Prerequisite_Nesting(
                         og_subj_code=subject_code,
                         og_code_num=course_num,
-                        id=id,
+                        id=current_box_id,  # The red ID in your drawing
                         relationship=(
                             models.PrerequisiteNestingTypeEnum.AND
                             if cur_type == "and"
                             else models.PrerequisiteNestingTypeEnum.OR
                         ),
-                        parent_id=parent_id,
+                        parent_id=parent_id,  # The green PID in your drawing
                     )
                 )
 
-                if parent_id is None:
-                    parent_id = 1
-
+                # 2. Iterate through children
                 for item in values:
                     if isinstance(item, str):
-                        # add to prerequitiste_course
-                        # og_subj_code = subject_code
-                        # og_code_num = course_num
-                        # parent_id = parent_id
-                        # new_subj_code = item.split(" ")[0]
-                        # new_code_num = item.split(" ")[1]
+                        # It's a leaf node (Course).
+                        # Its parent is the 'box' we are currently inside.
                         subj_code_num = item.split(" ")
                         prereq_course_models.append(
                             models.Prerequisite_Course(
                                 og_subj_code=subject_code,
                                 og_code_num=course_num,
-                                parent_id=parent_id,
+                                parent_id=current_box_id,  # Link to this box's ID
                                 new_subj_code=subj_code_num[0],
                                 new_code_num=subj_code_num[1],
                             )
                         )
                     else:
-                        # parent_id += 1
-                        recursion(item, parent_id + 1, id + 1)
+                        # It's another nested dict (a sub-box).
+                        # We pass our current_box_id so the child knows who its parent is.
+                        recursion(item, current_box_id)
 
-            recursion(prerequisites, None, 1)
+            # Initial call starts with None as the PID
+            recursion(prerequisites, None)
+
+            # print(len(prereq_nesting_models))
 
 
 def main(
@@ -585,6 +599,8 @@ def main(
             course_restriction,
             course_offering,
             course_faculty,
+        )
+        db_manager.commit_all(
             prereq_nesting,
             prereq_course,
         )

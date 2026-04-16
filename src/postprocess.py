@@ -295,19 +295,27 @@ class CodeMapper:
         return rcsid
 
 
-def remove_duplicates(items: list[str]) -> list[str]:
+def remove_duplicates(items: list[Any]) -> list[Any]:
     """
     Removes duplicates from a list while preserving the original order. Returns
     a new list without modifying the input list.
 
-    @param items: List of strings that may contain duplicates.
-    @return: New list of strings with duplicates removed, preserving original
+    @param items: List that may contain duplicates.
+    @return: New list of with hashable duplicates removed while preserving
         order.
     """
     seen = set()
     unique_items = []
     for item in items:
-        if item not in seen:
+        try:
+            # Check if the item is hashable for deduplication
+            hash(item)
+        except TypeError:
+            # Keep non-hashable values as-is without deduplication
+            unique_items.append(item)
+        else:
+            if item in seen:
+                continue
             seen.add(item)
             unique_items.append(item)
     return unique_items
@@ -421,7 +429,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                                 )
                                 subj_code = subj_name
                             new_list.append(f"{subj_code} {course_num}")
-                        class_entry[field] = remove_duplicates(new_list)
+                        class_entry[field] = new_list
 
                 # Prerequisites
                 def process_prereq_level(

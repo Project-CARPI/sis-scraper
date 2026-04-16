@@ -295,6 +295,24 @@ class CodeMapper:
         return rcsid
 
 
+def remove_duplicates(items: list[str]) -> list[str]:
+    """
+    Removes duplicates from a list while preserving the original order. Returns
+    a new list without modifying the input list.
+
+    @param items: List of strings that may contain duplicates.
+    @return: New list of strings with duplicates removed, preserving original
+        order.
+    """
+    seen = set()
+    unique_items = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            unique_items.append(item)
+    return unique_items
+
+
 def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> None:
     """
     Processes the course data for a single term, codifying subject codes, attribute codes,
@@ -337,7 +355,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                                 f"in term {term}"
                             )
                             new_attributes.append(attr)
-                    class_entry["attributes"] = new_attributes
+                    class_entry["attributes"] = remove_duplicates(new_attributes)
 
                 # Restrictions
                 if "restrictions" in class_entry:
@@ -354,7 +372,9 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                                 new_r_list.append(code)
                             else:
                                 new_r_list.append(restriction)
-                        class_entry["restrictions"][r_type] = new_r_list
+                        class_entry["restrictions"][r_type] = remove_duplicates(
+                            new_r_list
+                        )
 
                 # Faculty
                 if "faculty" in class_entry:
@@ -401,7 +421,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                                 )
                                 subj_code = subj_name
                             new_list.append(f"{subj_code} {course_num}")
-                        class_entry[field] = new_list
+                        class_entry[field] = remove_duplicates(new_list)
 
                 # Prerequisites
                 def process_prereq_level(
@@ -437,7 +457,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                             )
                             subj_code = subj_name
                         new_prereq_list.append(f"{subj_code} {course_num}")
-                    prereq_struct["values"] = new_prereq_list
+                    prereq_struct["values"] = remove_duplicates(new_prereq_list)
                     return prereq_struct
 
                 if "prerequisites" in class_entry:

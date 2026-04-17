@@ -321,7 +321,12 @@ def remove_duplicates(items: list[Any]) -> list[Any]:
     return unique_items
 
 
-def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> None:
+def process_term(
+    term: str,
+    term_data: dict[str, Any],
+    mapper: CodeMapper,
+    seen_courses: set[str],
+) -> None:
     """
     Processes the course data for a single term, codifying subject codes, attribute codes,
     restriction codes, and instructor RCSIDs, and updating the provided CodeMapper with
@@ -344,7 +349,9 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
             )
             continue
 
-        for _, class_list in subject_data["courses"].items():
+        for course_code, class_list in subject_data["courses"].items():
+            seen_courses.add(f"{subject_code} {course_code}")
+
             for class_entry in class_list:
                 # Attributes
                 if "attributes" in class_entry:
@@ -465,13 +472,104 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                             )
                             subj_code = subj_name
                         new_prereq_list.append(f"{subj_code} {course_num}")
-                    prereq_struct["values"] = remove_duplicates(new_prereq_list)
+                    new_prereq_list = remove_duplicates(new_prereq_list)
+                    prereq_struct["values"] = new_prereq_list
                     return prereq_struct
 
                 if "prerequisites" in class_entry:
                     class_entry["prerequisites"] = process_prereq_level(
                         class_entry["prerequisites"]
                     )
+
+
+def fill_missing_prereqs(
+    term: str,
+    term_data: dict[str, Any],
+    seen_courses: set[str],
+) -> None:
+    """
+    Creates dummy or placeholder course entries for any prerequisites
+    referenced in course data but not present as actual courses in the data.
+
+    @param term: Term identifier (e.g. "202509") for logging purposes.
+    @param term_data: Dictionary containing the course data for the term,
+        loaded from the raw output JSON files and processed by process_term.
+    @param seen_courses: Set of course identifiers (in "SUBJ CODE" format) that
+        have been seen in the actual course data for the term.
+    """
+    # Cast dictionary items to list to avoid "changed size during iteration" error
+    for _, subject_data in list(term_data.items()):
+        if "courses" not in subject_data:
+            continue
+
+        for _, class_list in list(subject_data["courses"].items()):
+            for class_entry in class_list:
+                if "prerequisites" not in class_entry:
+                    continue
+
+                prereq_struct = class_entry["prerequisites"]
+
+                def process_prereq_level(prereq_struct: dict[str, Any]) -> None:
+                    prereq_list = prereq_struct.get("values", [])
+                    for prereq in prereq_list:
+                        if isinstance(prereq, dict):
+                            # Nested structure
+                            process_prereq_level(prereq)
+                            continue
+                        if prereq not in seen_courses:
+                            logger.warning(
+                                f"Prerequisite {prereq} not found as a course, "
+                                f"creating placeholder entry in term {term}"
+                            )
+                            seen_courses.add(prereq)
+                            # Create placeholder course entry with minimal data
+                            try:
+                                subj_code, course_num = prereq.split()
+                                if subj_code not in term_data:
+                                    term_data[subj_code] = {
+                                        "subjectDescription": subj_code,
+                                        "courses": {},
+                                    }
+                                term_data[subj_code]["courses"][course_num] = [
+                                    {
+                                        "courseReferenceNumber": "",
+                                        "sectionNumber": "01",
+                                        "title": "PLACEHOLDER COURSE",
+                                        "description": "This is an artificially generated"
+                                        "placeholder course to fill in a missing"
+                                        "prerequisite reference from another course."
+                                        "This course likely cannot be found in SIS,"
+                                        "and may or may not actually exist.",
+                                        "attributes": [],
+                                        "restrictions": {},
+                                        "prerequisites": {},
+                                        "corequisites": [],
+                                        "crosslists": [],
+                                        "creditMin": 0,
+                                        "creditMax": 0,
+                                        "seatsCapacity": 0,
+                                        "seatsRegistered": 0,
+                                        "seatsAvailable": 0,
+                                        "waitlistCapacity": 0,
+                                        "waitlistRegistered": 0,
+                                        "waitlistAvailable": 0,
+                                        "faculty": [],
+                                        "meetingInfo": [],
+                                    }
+                                ]
+                                # Sort courses by course number for consistency
+                                term_data[subj_code]["courses"] = dict(
+                                    sorted(
+                                        term_data[subj_code]["courses"].items(),
+                                        key=lambda x: x[0],
+                                    )
+                                )
+                            except ValueError:
+                                logger.error(
+                                    f"Unexpected prerequisite format: '{prereq}'"
+                                )
+
+                process_prereq_level(prereq_struct)
 
 
 def main(
@@ -529,24 +627,40 @@ def main(
         subject_code_name_map_path,
     )
 
+    # Initialize seen course set
+    seen_courses = set()
+
     try:
         processed_output_data_dir.mkdir(exist_ok=True, parents=True)
+
+        term_data_list: list[tuple[str, dict[str, Any]]] = []
 
         # Process each term course data file
         for term_file in output_data_dir.glob("*.json"):
             try:
                 with term_file.open("r", encoding="utf-8") as f:
                     term_course_data = json.load(f)
-                process_term(term_file.stem, term_course_data, mapper)
-                # Write processed data
-                processed_file_path = processed_output_data_dir / term_file.name
-                with processed_file_path.open("w", encoding="utf-8") as f:
-                    logger.info(f"Writing processed data to {processed_file_path}")
-                    json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+                process_term(term_file.stem, term_course_data, mapper, seen_courses)
+                # Store processed data
+                term_data_list.append((term_file.stem, term_course_data))
             except Exception as e:
                 logger.error(
                     f"Error processing term data from {term_file}, aborting term: {e}"
                     f"\n{traceback.format_exc()}"
+                )
+
+        for term_code, term_course_data in term_data_list:
+            try:
+                fill_missing_prereqs(term_code, term_course_data, seen_courses)
+                # Write processed term data to output directory
+                processed_data_path = processed_output_data_dir / f"{term_code}.json"
+                with processed_data_path.open("w", encoding="utf-8") as f:
+                    logger.info(f"Writing processed data to {processed_data_path}")
+                    json.dump(term_course_data, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                logger.error(
+                    f"Error filling missing prerequisites for term data from {term_file}, "
+                    f"aborting term: {e}\n{traceback.format_exc()}"
                 )
 
         # Save updated mappings

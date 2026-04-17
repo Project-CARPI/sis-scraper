@@ -451,15 +451,15 @@ def process_term(
                             # Nested structure
                             new_prereq_list.append(process_prereq_level(prereq))
                             continue
-                        # Parse "[subject_name] [course_number]"
-                        match = re.match(r"(.+)\s+(\S+)", prereq)
+                        # Parse "[subject_name] [course_number_4_digits]"
+                        match = re.match(r"^(.+?)\s+(\d{4})$", prereq)
+                        # Ignore unexpected formats but log a warning
                         if not match:
                             logger.warning(
                                 f"Unexpected prerequisite format: '{prereq}' "
                                 f"for CRN {class_entry['courseReferenceNumber']} "
                                 f"in term {term}"
                             )
-                            new_prereq_list.append(prereq)
                             continue
                         subj_name, course_num = match.groups()
                         subj_code = mapper.get_subject_code(subj_name)

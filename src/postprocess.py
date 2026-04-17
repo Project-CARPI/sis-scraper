@@ -426,6 +426,9 @@ def process_term(
                         for item in class_entry[field]:
                             subj_name = item["subjectName"]
                             course_num = item["courseNumber"]
+                            if subj_name == "Computer Science (H)":
+                                # Handle special case where subject name includes parenthetical "(H)"
+                                subj_name = "Computer Science"
                             subj_code = mapper.get_subject_code(subj_name)
                             # Fallback to subject name if code mapping not found
                             if subj_code is None:
@@ -462,6 +465,9 @@ def process_term(
                             )
                             continue
                         subj_name, course_num = match.groups()
+                        if subj_name == "Computer Science (H)":
+                            # Handle special case where subject name includes parenthetical "(H)"
+                            subj_name = "Computer Science"
                         subj_code = mapper.get_subject_code(subj_name)
                         # Fallback to subject name if code mapping not found
                         if subj_code is None:

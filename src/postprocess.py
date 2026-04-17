@@ -429,7 +429,7 @@ def process_term(term: str, term_data: dict[str, Any], mapper: CodeMapper) -> No
                                 )
                                 subj_code = subj_name
                             new_list.append(f"{subj_code} {course_num}")
-                        class_entry[field] = new_list
+                        class_entry[field] = remove_duplicates(new_list)
 
                 # Prerequisites
                 def process_prereq_level(

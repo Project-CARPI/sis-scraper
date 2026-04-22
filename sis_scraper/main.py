@@ -37,17 +37,18 @@ if __name__ == "__main__":
     start_year = args.start_year
     end_year = args.end_year
 
-    # Ensure script has a valid parent directory
+    # Ensure script has a valid parent and grandparent directory
     parent_dir = Path(__file__).parent
-    if parent_dir == Path(__file__):
+    grandparent_dir = parent_dir.parent
+    if not parent_dir.is_dir() or not grandparent_dir.is_dir():
         print(
-            "ERROR: Could not determine this script's parent directory. "
+            "ERROR: Could not determine this script's parent or grandparent directory. "
             "Ensure that the script is not being run from within a zip file."
         )
         sys.exit(1)
 
     # Load environment variables from .env file if it exists
-    if not load_dotenv():
+    if not load_dotenv(grandparent_dir / ".env"):
         print(
             "ERROR: No environment variables found. Ensure that an .env file exists in "
             "the same directory as this script and that all required variables are set."

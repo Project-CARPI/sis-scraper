@@ -1,14 +1,12 @@
 #!/bin/bash
 
 # --- CONFIGURATION ---
-DISCORD_WEBHOOK_URL="REPLACE_WITH_DISCORD_WEBHOOK_URL"
-LOGS_DIR="REPLACE_WITH_DIR_PATH"
+LOGS_DIR="scraper_logs"
 LOG_FILE="$LOGS_DIR/$(date +%Y%m%d_%H%M%S).log"
 SERVER_NAME=$(hostname)
 
-SIS_SCRAPER_REPO="REPLACE_WITH_SIS_SCRAPER_REPO_PATH"
-SIS_SCRAPER_DIR="$SIS_SCRAPER_REPO/sis_scraper"
-PYTHON_PATH="$SIS_SCRAPER_REPO/.venv/bin/python3"
+SIS_SCRAPER_DIR="scraper/sis_scraper"
+PYTHON_PATH="python3"
 SCRAPER_COMMAND="$PYTHON_PATH $SIS_SCRAPER_DIR/main.py scrape 1998 $(date +%Y)"
 POSTPROCESS_COMMAND="$PYTHON_PATH $SIS_SCRAPER_DIR/main.py postprocess"
 COMMIT_DB_COMMAND="$PYTHON_PATH $SIS_SCRAPER_DIR/main.py commitdb"
@@ -32,8 +30,8 @@ run_pipeline() {
 # Create log folder if it doesn't exist
 mkdir -p $LOGS_DIR
 
-# Run scraper and redirect output to a log file
-run_pipeline >> "$LOG_FILE" 2>&1
+# Run scraper, output to stdout and save to a log file
+run_pipeline 2>&1 | tee "$LOG_FILE"
 
 # Capture exit status of last command
 EXIT_STATUS=$?
@@ -59,5 +57,5 @@ if [ $EXIT_STATUS -ne 0 ]; then
 EOF
 )
 
-    curl -H "Content-Type: application/json" -X POST -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"
+    curl -H "Content-Type: application/json" -X POST -d "$PAYLOAD" "$SCRAPER_DISCORD_WEBHOOK_URL"
 fi

@@ -5,7 +5,7 @@ TEMP_LOG="/tmp/current_run.log"
 SERVER_NAME=$(hostname)
 
 PYTHON_PATH="python3"
-SIS_SCRAPER_DIR="scraper/sis_scraper"
+SIS_SCRAPER_DIR="scraper/src"
 
 SCRAPER_COMMAND="$PYTHON_PATH $SIS_SCRAPER_DIR/main.py scrape 1998 $(date +%Y)"
 POSTPROCESS_COMMAND="$PYTHON_PATH $SIS_SCRAPER_DIR/main.py postprocess"

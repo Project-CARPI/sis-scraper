@@ -8,6 +8,12 @@
 #
 # This will start the containers, open a bash shell in the sis-scraper container
 # for interactive use, and then stop the containers when you exit the shell.
+#
+# The bash shell can be exited via "exit" or Ctrl+D, which will then trigger the
+# "docker compose down" command to stop the containers and clean up resources.
+#
+# The test database volume persists between Docker start and stop cycles; it must
+# be manually removed in order to recreate the database from scratch.
 
 name: sis-scraper-dev-stack
 

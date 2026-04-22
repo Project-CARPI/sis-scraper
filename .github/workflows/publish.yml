@@ -2,11 +2,9 @@ name: Build and Push Docker Image to GHCR
 
 # Run this workflow every time code is pushed or merged to the main branch
 on:
-  # Temporarily trigger on all pushes for testing
-  [push]
-  # push:
-  #   branches:
-  #     - main
+  push:
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io

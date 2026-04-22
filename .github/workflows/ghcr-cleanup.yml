@@ -2,9 +2,6 @@ name: Clean GHCR Images
 
 # Run this workflow on a regular schedule
 on:
-  push:
-    branches:
-      - deployment-setup
   # Run at midnight every day (UTC on GitHub's servers)
   schedule:
     - cron: "0 0 * * *"

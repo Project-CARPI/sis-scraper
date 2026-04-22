@@ -1,0 +1,17 @@
+# Ignore all files
+
+*
+
+# Whitelist necessary build files
+!requirements.txt
+!crontab
+!cron_job.sh
+
+# Allow Docker to read src directory
+!src/
+
+# Ignore everything inside src
+src/*
+
+# Only allow .py files within src and its subdirectories
+!src/**/*.py

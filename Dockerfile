@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-# Install cron and curl
-RUN apt-get update && apt-get install -y cron curl
+# Install cron, curl, and git
+RUN apt-get update && apt-get install -y cron curl git
 
 # Clean up apt cache to reduce image size
 RUN rm -rf /var/lib/apt/lists/*

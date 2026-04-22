@@ -1,0 +1,5 @@
+services:
+  sis_scraper:
+    build: .
+    env_file:
+      - .env

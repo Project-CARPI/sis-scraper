@@ -1,20 +1,73 @@
+# Docker Compose configuration for the SIS scraper development environment.
+#
+# This file defines two services: a test MySQL database and the SIS scraper
+# application itself.
+#
+# To start the development environment, run:
+# docker compose run --rm sis-scraper bash && docker compose down
+#
+# This will start the containers, open a bash shell in the sis-scraper container
+# for interactive use, and then stop the containers when you exit the shell.
+
+name: sis-scraper-dev-stack
+
 services:
-  sis_scraper:
-    build: .
-    # Environment variables are interpolated as this service may be included in
-    # other Compose contexts that provide values from their own .env files.
+  db:
+    image: mysql:8.0
+    container_name: test_db
+    restart: always
     environment:
-      SCRAPER_LOGS_DIR: ${SCRAPER_LOGS_DIR}
-      SCRAPER_CODE_MAPS_DIR: ${SCRAPER_CODE_MAPS_DIR}
-      SCRAPER_RAW_OUTPUT_DATA_DIR: ${SCRAPER_RAW_OUTPUT_DATA_DIR}
-      SCRAPER_PROCESSED_OUTPUT_DATA_DIR: ${SCRAPER_PROCESSED_OUTPUT_DATA_DIR}
-      ATTRIBUTE_CODE_NAME_MAP_FILENAME: ${ATTRIBUTE_CODE_NAME_MAP_FILENAME}
-      INSTRUCTOR_RCSID_NAME_MAP_FILENAME: ${INSTRUCTOR_RCSID_NAME_MAP_FILENAME}
-      RESTRICTION_CODE_NAME_MAP_FILENAME: ${RESTRICTION_CODE_NAME_MAP_FILENAME}
-      SUBJECT_CODE_NAME_MAP_FILENAME: ${SUBJECT_CODE_NAME_MAP_FILENAME}
-      DB_DIALECT: ${DB_DIALECT}
-      DB_API: ${DB_API}
-      DB_HOSTNAME: ${DB_HOSTNAME}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_SCHEMA: ${DB_SCHEMA}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_SCHEMA}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-u",
+          "${DB_USERNAME}",
+          "--password=${DB_PASSWORD}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sis-scraper:
+    build: .
+    image: sis-scraper:latest
+    container_name: sis-scraper
+    # Ensure image is built locally and is not pulled from a registry
+    pull_policy: build
+    restart: on-failure
+    # Enable interactive mode to allow scraper command input and output
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    # Override the Dockerfile's CMD ("cron -f")
+    # This keeps the container running indefinitely doing nothing, allowing you
+    # to exec into it to run commands interactively.
+    command: ["bash"]
+    # Mount local code over the code built into the container for automatic
+    # reloading during development.
+    volumes:
+      - .:/scraper
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: rebuild
+          path: requirements.txt
+
+volumes:
+  mysql_data:

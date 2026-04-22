@@ -1,5 +1,6 @@
-name: Black Check
+name: Black Formatting Check
 
+# Run on every push and pull request
 on: [push, pull_request]
 
 jobs:
@@ -8,12 +9,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.12.2"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |

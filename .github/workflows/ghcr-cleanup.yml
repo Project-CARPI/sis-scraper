@@ -1,0 +1,27 @@
+name: Clean GHCR Images
+
+# Run this workflow on a regular schedule
+on:
+  push:
+    branches:
+      - deployment-setup
+  # Run at midnight every day (UTC on GitHub's servers)
+  schedule:
+    - cron: "0 0 * * *"
+  # Allow manual triggering from the GitHub web interface
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    # Required permissions to delete packages from GitHub Container Registry
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old or untagged images
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          keep-n-tagged: 10
+          delete-untagged: true

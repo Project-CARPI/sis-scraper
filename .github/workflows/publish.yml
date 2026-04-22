@@ -1,0 +1,54 @@
+name: Build and Push Docker Image to GHCR
+
+# Run this workflow every time code is pushed or merged to the main branch
+on:
+  # Temporarily trigger on all pushes for testing
+  [push]
+  # push:
+  #   branches:
+  #     - main
+
+env:
+  REGISTRY: ghcr.io
+  # Typically resolves to "owner/repository"
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    # Required permissions to push to GitHub Container Registry
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # This action automatically extracts tags and labels
+      - name: Extract metadata (tags, labels) for Docker
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      # Build and push the Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          # Uses outputs from previous metadata step to tag and label the image
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}

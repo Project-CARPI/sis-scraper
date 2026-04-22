@@ -1,6 +1,8 @@
 services:
   sis_scraper:
     build: .
+    # Environment variables are interpolated as this service may be included in
+    # other Compose contexts that provide values from their own .env files.
     environment:
       SCRAPER_LOGS_DIR: ${SCRAPER_LOGS_DIR}
       SCRAPER_CODE_MAPS_DIR: ${SCRAPER_CODE_MAPS_DIR}

@@ -35,8 +35,22 @@ services:
     # Enable interactive mode to allow scraper command input and output
     stdin_open: true
     tty: true
-    env_file:
-      - .env
+    environment:
+      SCRAPER_LOGS_DIR: ${SCRAPER_LOGS_DIR}
+      SCRAPER_CODE_MAPS_DIR: ${SCRAPER_CODE_MAPS_DIR}
+      SCRAPER_RAW_OUTPUT_DATA_DIR: ${SCRAPER_RAW_OUTPUT_DATA_DIR}
+      SCRAPER_PROCESSED_OUTPUT_DATA_DIR: ${SCRAPER_PROCESSED_OUTPUT_DATA_DIR}
+      ATTRIBUTE_CODE_NAME_MAP_FILENAME: ${ATTRIBUTE_CODE_NAME_MAP_FILENAME}
+      INSTRUCTOR_RCSID_NAME_MAP_FILENAME: ${INSTRUCTOR_RCSID_NAME_MAP_FILENAME}
+      RESTRICTION_CODE_NAME_MAP_FILENAME: ${RESTRICTION_CODE_NAME_MAP_FILENAME}
+      SUBJECT_CODE_NAME_MAP_FILENAME: ${SUBJECT_CODE_NAME_MAP_FILENAME}
+      DB_DIALECT: ${DB_DIALECT}
+      DB_API: ${DB_API}
+      # Hardcode the DB_HOSTNAME environment variable
+      DB_HOSTNAME: db:3306
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_SCHEMA: ${DB_SCHEMA}
     # Override the DB_HOSTNAME environment variable
     environment:
       DB_HOSTNAME: db:3306

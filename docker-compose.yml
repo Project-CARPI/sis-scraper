@@ -5,22 +5,19 @@
 # and a shared Docker network for testing.
 #
 # To start the development environment, run:
-# docker compose run --rm sis-scraper
+# docker compose run --rm sis-scraper && docker compose down
 #
 # This will start both the shared development environment and the sis-scraper
 # container, opening a bash shell in the sis-scraper container for interactive
 # use. The shell can be exited via "exit" or Ctrl+D.
 #
-# The shared development environment will continue running in the background by
-# default after the shell is exited. This is to allow the database to remain
-# available for subsequent runs of the SIS scraper container or for other
-# services in the organization, such as the API.
+# Once the shell is exited, the "docker compose down" command will stop the
+# shared development environment.
 #
-# To stop the shared development environment, run:
-# docker compose down
-#
-# The test database volume persists between Docker start and stop cycles; it must
-# be manually removed in order to recreate the database from scratch.
+# The test database volume persists between Docker start and stop cycles so
+# that test data remains available across both development sessions and other
+# services that depend on the database. The volume must be manually removed in
+# order to build the database from scratch.
 
 name: sis-scraper-dev-environment
 
@@ -50,8 +47,6 @@ services:
     # reloading during development.
     volumes:
       - .:/scraper
-    networks:
-      - carpi-dev-network
     depends_on:
       db:
         condition: service_healthy

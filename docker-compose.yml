@@ -51,7 +51,7 @@ services:
     volumes:
       - .:/scraper
     networks:
-      - carpi-test-network
+      - carpi-dev-network
     depends_on:
       db:
         condition: service_healthy

@@ -1,52 +1,33 @@
 # Docker Compose configuration for the SIS scraper development environment.
 #
-# This file defines two services: a test MySQL database and the SIS scraper
-# application itself.
+# This Compose file includes a shared development environment configuration
+# from the Project-CARPI/.github repository, which contains a database service
+# and a shared Docker network for testing.
 #
 # To start the development environment, run:
-# docker compose run --rm sis-scraper bash && docker compose down
+# docker compose run --rm sis-scraper
 #
-# This will start the containers, open a bash shell in the sis-scraper container
-# for interactive use, and then stop the containers when you exit the shell.
+# This will start both the shared development environment and the sis-scraper
+# container, opening a bash shell in the sis-scraper container for interactive
+# use. The shell can be exited via "exit" or Ctrl+D.
 #
-# The bash shell can be exited via "exit" or Ctrl+D, which will then trigger the
-# "docker compose down" command to stop the containers and clean up resources.
+# The shared development environment will continue running in the background by
+# default after the shell is exited. This is to allow the database to remain
+# available for subsequent runs of the SIS scraper container or for other
+# services in the organization, such as the API.
+#
+# To stop the shared development environment, run:
+# docker compose down
 #
 # The test database volume persists between Docker start and stop cycles; it must
 # be manually removed in order to recreate the database from scratch.
 
-name: sis-scraper-dev-stack
+name: sis-scraper-dev-environment
+
+include:
+  - https://github.com/Project-CARPI/.github.git#main:shared-dev-env/docker-compose.yml
 
 services:
-  db:
-    image: mysql:8.0
-    container_name: test_db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_SCHEMA}
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "127.0.0.1",
-          "-u",
-          "${DB_USERNAME}",
-          "--password=${DB_PASSWORD}",
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   sis-scraper:
     build: .
     image: sis-scraper:latest
@@ -59,14 +40,18 @@ services:
     tty: true
     env_file:
       - .env
+    # Override the DB_HOSTNAME environment variable
+    environment:
+      DB_HOSTNAME: db:3306
     # Override the Dockerfile's CMD ("cron -f")
-    # This keeps the container running indefinitely doing nothing, allowing you
-    # to exec into it to run commands interactively.
+    # Allows bash commands to be run interactively for development purposes
     command: ["bash"]
     # Mount local code over the code built into the container for automatic
     # reloading during development.
     volumes:
       - .:/scraper
+    networks:
+      - carpi-test-network
     depends_on:
       db:
         condition: service_healthy
@@ -74,6 +59,3 @@ services:
       watch:
         - action: rebuild
           path: requirements.txt
-
-volumes:
-  mysql_data:

@@ -51,9 +51,6 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_SCHEMA: ${DB_SCHEMA}
-    # Override the DB_HOSTNAME environment variable
-    environment:
-      DB_HOSTNAME: db:3306
     # Override the Dockerfile's CMD ("cron -f")
     # Allows bash commands to be run interactively for development purposes
     command: ["bash"]

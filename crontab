@@ -1,2 +1,2 @@
-# Run every day at 12:00 AM. Route logs to stdout for Docker to capture
-0 0 * * * root /app/sis_scraper/cron_job.sh >> /proc/1/fd/1 2>&1
+# Run every day at 12:00 AM and route logs to stdout
+0 0 * * * root /scraper/cron_job.sh >> /proc/1/fd/1 2>&1
